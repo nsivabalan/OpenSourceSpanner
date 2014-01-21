@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.7"/>
+	<classpathentry kind="lib" path="/home/sivabalan/Documents/softies/jzmq-master/src/zmq.jar"/>
+	<classpathentry kind="lib" path="/home/sivabalan/jars/commons-cli-1.1.jar"/>
+	<classpathentry kind="lib" path="/home/sivabalan/jars/commons-io-1.2.jar"/>
+	<classpathentry kind="lib" path="/home/sivabalan/jars/gson-2.2.2.jar"/>
+	<classpathentry kind="lib" path="/home/sivabalan/Downloads/hbase/hbase-0.94.5/hbase-0.94.5.jar"/>
+	<classpathentry kind="lib" path="/home/sivabalan/hbasejars/hadoop-core-1.0.4.jar"/>
+	<classpathentry kind="lib" path="/home/sivabalan/hbasejars/commons-configuration-1.6.jar"/>
+	<classpathentry kind="lib" path="/home/sivabalan/hbasejars/commons-lang-2.5.jar"/>
+	<classpathentry kind="lib" path="/home/sivabalan/hbasejars/commons-logging-1.1.1.jar"/>
+	<classpathentry kind="lib" path="/home/sivabalan/hbasejars/zookeeper-3.4.5.jar"/>
+	<classpathentry kind="lib" path="/home/sivabalan/hbasejars/log4j-1.2.16.jar"/>
+	<classpathentry kind="lib" path="/home/sivabalan/hbasejars/protobuf-java-2.4.0a.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

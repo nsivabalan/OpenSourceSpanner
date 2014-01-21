@@ -1,0 +1,12 @@
+TPC=S1
+2
+S1=S1.1;S1.1,S1.2,S1.3
+S2=S2.1;S2.1,S2.2,S2.3
+S1Leader=10004
+S2Leader=20004
+S1.1=localhost:10001
+S1.2=localhost:10002
+S1.3=localhost:10003
+S2.1=localhost:20001
+S2.2=localhost:20002
+S2.3=localhost:20003

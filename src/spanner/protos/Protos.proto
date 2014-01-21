@@ -1,0 +1,155 @@
+package protos;
+
+option java_package = "spanner.protos";
+option java_outer_classname = "Protos";
+
+message TransactionProto
+{
+	optional string transactionID = 1;
+	enum TransactionStatusProto
+	{
+		ACTIVE = 0;
+		PENDING = 1;
+		COMMITTED = 2;
+		ABORTED = 3;
+	}
+	optional TransactionStatusProto transactionStatus = 2;
+	optional ElementsSetProto readSet = 3;
+	optional ElementsSetProto writeSet = 4;
+	optional ElementToServerMapping ReadSetServerToRecordMappings = 5;
+	optional ElementToServerMapping WriteSetServerToRecordMappings = 6;
+	optional ElementMappingsProto elementMappings = 7;
+	optional int32 hostNodeID = 8;
+	optional NodeProto clientAddress = 9;
+}
+
+message TransactionMetaDataProto
+{
+	optional string transactionID = 1;
+	enum TransactionStatusProto
+	{
+		ACTIVE = 0;
+		PENDING = 1;
+		COMMITTED = 2;
+		ABORTED = 3;
+	}
+	optional TransactionStatusProto transactionStatus = 2;
+	optional ElementsSetProto readSet = 3;
+	optional ElementsSetProto writeSet = 4;
+	optional ElementToServerMapping ReadSetServerToRecordMappings = 5;
+	optional ElementToServerMapping WriteSetServerToRecordMappings = 6;
+	optional ElementMappingsProto elementMappings = 7;
+	optional int32 hostNodeID = 8;
+	optional NodeProto TwoPC = 9;
+}
+
+
+message PartitionServerProto{
+	required NodeProto host = 1;
+	required string partition = 2;
+}
+
+message PartitionServerElementProto{
+	required PartitionServerProto partitionServer = 1;
+	required ElementsSetProto elements = 2; 
+}
+
+message ElementPartitionServerProto{
+	repeated string rowKey = 1;
+	required PartitionServerProto partitionServer = 2;
+}
+
+message ElementToServerMapping{
+	repeated PartitionServerElementProto partitionServerElement = 1;
+}
+
+message RowKeyMapProto{
+	repeated PartitionServerElementProto partitionServerElement = 1;
+}
+
+message ElementMappingsProto{
+	repeated ElementPartitionServerProto elementPartitionServer = 1;
+}
+
+message ElementsSetProto
+{
+	enum ElementsSetTypeProto
+	{
+		READSET = 0;
+		WRITESET = 1;
+	}
+	optional ElementsSetTypeProto elementsSetType = 1;
+	repeated ElementProto elements = 2;
+}
+
+message ColElementProto{
+	required string col = 1;
+	optional string value = 2;
+}
+
+message ElementProto {
+  optional string row = 1;
+  repeated ColElementProto cols = 2;
+  optional int64 version = 3 [default = -1];
+}
+
+
+message NodeProto{
+  required string host = 1;
+  required int32 port = 2;
+}
+
+message ApplyMessage {
+  required TransactionProto trans = 1;
+  optional NodeProto server = 2;
+	optional NodeProto source = 3;
+
+}
+
+message ReadMessage{
+	required NodeProto server = 1;
+	required NodeProto source = 2;
+	optional ElementProto elem = 3;
+	optional int32 transID = 4;
+}
+
+message ValueMessage {
+  required string value = 1;
+  required int32 transId = 2;
+  required int64 version = 3;
+optional NodeProto server = 4;
+	optional NodeProto source = 5;
+}
+
+message CommitReplyMessage {
+  required bool isSuccessful = 1;
+  optional NodeProto server = 2;
+	optional NodeProto source = 3;
+
+}
+
+message CommitRequestMessage {
+  required TransactionProto trans = 1;
+  optional NodeProto server = 2;
+	optional NodeProto source = 3;
+
+}
+
+message MetaDataRequestMessage {
+  required TransactionProto trans = 1;
+  optional NodeProto server = 2;
+	optional NodeProto source = 3;
+}
+
+message MetaDataResponseMessage {
+  required TransactionProto trans = 1;
+  optional NodeProto server = 2;
+	optional NodeProto source = 3;
+
+}
+
+message ReleaseMessage {
+  required TransactionProto trans = 1;
+  optional NodeProto server = 2;
+	optional NodeProto source = 3;
+}
