@@ -1,5 +1,7 @@
 package spanner.metadataservice;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -27,20 +29,32 @@ public class MetaDS {
 	HashMap<String, ArrayList<NodeProto>> shardToAcceptorsMap;
 	ArrayList<String> orderedShards = new ArrayList<String>();
 
-	public MetaDS()
+	public MetaDS() throws IOException
 	{
 		serverAddressMap = new HashMap<String,NodeProto>();
 		shardToParticipantMap = new HashMap<String, NodeProto>();
 		shardToAcceptorsMap = new HashMap<String, ArrayList<NodeProto>>();
 		String[] shards = Common.getProperty("shards").split(",");
+		String paxosLog = Common.PaxosLog;
+		File paxosLogFile = new File(paxosLog);
+		if(! paxosLogFile.exists())
+			paxosLogFile.mkdir();
+		
 		for(String shard: shards)
 		{
+			File tempPartition = new File(paxosLog+"/"+shard);
+			if( !tempPartition.exists())
+				tempPartition.mkdir();
 			String[] shardDetails = Common.getProperty(shard).split(";");
 			String shardLeader = shardDetails[0];
 			String[] acceptors = shardDetails[1].split(",");
 			shardToAcceptorsMap.put(shard, new ArrayList<NodeProto>());
 			for(String acceptor: acceptors)
 			{
+				File tempAcceptor = new File(tempPartition+"/"+acceptor+"_.log");
+				if( !tempAcceptor.exists())
+					tempAcceptor.createNewFile();
+				
 				String[] hostdetail = Common.getProperty(acceptor).split(":");
 				if(hostdetail[0].equalsIgnoreCase("localhost")){
 					NodeProto tempNode = NodeProto.newBuilder().setHost("127.0.0.1").setPort(Integer.parseInt(hostdetail[1])).build();

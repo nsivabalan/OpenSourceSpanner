@@ -194,7 +194,7 @@ public class TransClient extends Node implements Runnable{
 	{
 		System.out.println("Sending Client Request "+message);
 		socketPush = context.socket(ZMQ.PUSH);
-		System.out.println(" "+dest.getHost()+":"+dest.getPort());
+		System.out.println("Destination ::::: "+dest.getHost()+":"+dest.getPort());
 		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 		System.out.println(" "+socketPush.getLinger());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());

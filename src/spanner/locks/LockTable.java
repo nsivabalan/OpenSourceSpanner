@@ -14,9 +14,30 @@ public class LockTable {
 	
 	public boolean acquireLock(String row, String uid)
 	{
+		if(lockTable.containsKey(row) ){
+			if( lockTable.get(row).equalsIgnoreCase(uid)){
+				printLocks();
+				return true;
+			}
+			else{
+				printLocks();
+				return false;
+			}
+		}
+		else
+		{
+			lockTable.put(row, uid);
+			printLocks();
+			return true;
+		}
+		
+	}
+	
+	public boolean acquireReadLockIfNot(String row, String uid)
+	{
 		if(lockTable.containsKey(row) )
 			if( lockTable.get(row).equalsIgnoreCase(uid))
-			return true;
+				return true;
 			else
 				return false;
 		else
@@ -28,6 +49,7 @@ public class LockTable {
 	
 	public void printLocks()
 	{
+		System.out.println("Total keys in lock table "+lockTable.size());
 		for(String key : lockTable.keySet())
 			System.out.println("Lock for Key "+key +" acquired by "+lockTable.get(key));
 	}

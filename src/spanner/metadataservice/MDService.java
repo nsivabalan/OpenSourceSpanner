@@ -39,10 +39,16 @@ public class MDService extends Node implements Runnable{
 		socket = context.socket(ZMQ.PULL);
 		System.out.println(" Listening to "+Common.getLocalAddress(port));
 		socket.bind(Common.getLocalAddress(port));
+		createLogFiles();
 		metadataService = new MetaDS();
 
 	}
 	
+	
+	private void createLogFiles()
+	{
+		
+	}
 	
 	public void run()
 	{

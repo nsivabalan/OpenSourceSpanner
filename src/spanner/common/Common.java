@@ -48,6 +48,7 @@ public class Common {
 	public enum PLeaderState{ACTIVE, INIT, DORMANT};
 	public enum AcceptorState{ACCEPT, COMMIT, COMMIT_ACK, ABORT, ABORT_ACK};
 	public enum TPCState{INIT, COMMIT, COMMIT_ACK, ABORT, ABORT_ACK};
+	public static final long TRANS_TIMEOUT = 100000;
 	
 	public static String getProperty(String str)
 	{

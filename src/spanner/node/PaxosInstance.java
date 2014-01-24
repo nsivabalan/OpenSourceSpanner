@@ -13,6 +13,7 @@ public class PaxosInstance{
 	HashSet<NodeProto> acks;
 	HashSet<NodeProto> accepts;
 	HashSet<NodeProto> decides;
+	Long startTime;
 	BallotNumber highest;
 	boolean isAcceptSent ;
 	boolean isDecideSent ;
@@ -36,6 +37,7 @@ public class PaxosInstance{
 		this.highest = null;
 		this.accepts = new HashSet<NodeProto>();
 		this.acceptedValue = acceptedValue;
+		this.decides = new HashSet<NodeProto>();
 	}
 	
 	
@@ -57,6 +59,16 @@ public class PaxosInstance{
 	public int getAckCount()
 	{
 		return this.acks.size();
+	}
+	
+	public void setTimeStamp(long timeStamp)
+	{
+		this.startTime = timeStamp;
+	}
+	
+	public long getTimeStamp()
+	{
+		return this.startTime;
 	}
 	
 	public HashSet<NodeProto> getAckList()

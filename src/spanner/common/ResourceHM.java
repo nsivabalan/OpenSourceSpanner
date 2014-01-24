@@ -86,9 +86,11 @@ public class ResourceHM {
 			String rowKey = element.getRow();
 			ElementProto.Builder recordBuilder = ElementProto.newBuilder().setRow(rowKey);
 			HashMap<String, String> record = hbaseMap.get(rowKey);
+			System.out.println("Record "+rowKey+" :: "+record);
 			for(ColElementProto colElem : element.getColsList())
 			{
 				String colName = colElem.getCol();
+				System.out.println("ColName "+colName+", value "+record.get(colName));
 				ColElementProto colElement = ColElementProto.newBuilder().setCol(colName).setValue(record.get(colName)).build();
 				recordBuilder.addCols(colElement);
 			}
