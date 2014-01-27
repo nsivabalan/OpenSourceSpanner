@@ -37,6 +37,7 @@ import spanner.common.Common.ClientOPMsgType;
 import spanner.common.Common.PaxosDetailsMsgType;
 import spanner.common.Common.PaxosMsgType;
 import spanner.common.Common.State;
+import spanner.common.Common.TransactionType;
 import spanner.common.Resource;
 import spanner.common.ResourceHM;
 
@@ -111,7 +112,6 @@ public class Participant extends Node implements Runnable{
 		//socket.bind(Common.getLocalAddress(Integer.parseInt(hostdetails[1])));
 		socket.bind("tcp://127.0.0.1:"+hostdetails[1]);
 		pendingTransactions = new ArrayList<UUID>();
-
 		this.uidTransactionStatusMap = new LinkedHashMap<UUID, TransactionStatus>();
 		localResource = new ResourceHM(this.LOGGER);
 		lockTable = new LockTable();
@@ -207,6 +207,7 @@ public class Participant extends Node implements Runnable{
 						//Print msg
 						System.out.println("Received " + msg);
 						this.AddLogEntry(new String("Received "+msg), Level.INFO);
+						
 						if(msg.getMsgType() == TwoPCMsgType.INFO)
 						{
 							//ProcessInfoMessage(msg);

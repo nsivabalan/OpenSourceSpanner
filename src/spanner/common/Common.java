@@ -35,7 +35,7 @@ public class Common {
 	public static String tableName = "default_Table";
 	
 	public enum State {ACTIVE, PAUSED};
-	public enum TransactionType{ STARTED, READINIT, READDONE, WRITEINIT, COMMIT, ABORT};
+	public enum TransactionType{ STARTED, READINIT, READDONE, WRITEINIT, COMMIT, ABORT, PREPARE_DONE};
 	public enum RequestType {PREPARE, COMMIT, ABORT};
 	public enum ClientOPMsgType{READ,WRITE,READ_RESPONSE,UNLOCK, COMMIT, RELEASE_RESOURCE, WRITE_RESPONSE,ABORT};
 	public enum MetaDataMsgType{REQEUST, RESPONSE};
