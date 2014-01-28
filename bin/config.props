@@ -1,0 +1,14 @@
+TPC=S1
+S1=1;1,2,3
+S2=4;4,5,6
+S1Leader=10004
+S2Leader=20004
+1=localhost:10001
+2=localhost:10002
+3=localhost:10003
+4=localhost:20001
+5=localhost:20002
+6=localhost:20003
+shards=S1,S2
+mds=localhost:11111
+transClient=localhost:12345
