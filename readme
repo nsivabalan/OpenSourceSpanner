@@ -1,3 +1,10 @@
 Open source version of Spanner
 
+classes to look for : 
+PaxosAcceptor
+TwoPC
+TransClient
+UserClient
+MDService
+
 
