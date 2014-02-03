@@ -45,7 +45,7 @@ import spanner.protos.Protos.TransactionProto;
 import spanner.protos.Protos.TransactionProtoOrBuilder;
 import spanner.protos.Protos.TransactionProto.TransactionStatusProto;
 
-public class PAcceptor extends Node implements Runnable{
+public class PAcceptor_Mod extends Node implements Runnable{
 
 	ZMQ.Context context = null;
 	ZMQ.Socket publisher = null;
@@ -72,7 +72,7 @@ public class PAcceptor extends Node implements Runnable{
 	private static ResourceHM localResource = null;
 
 	private int acceptedValue = -1;
-	public PAcceptor(String shard, String nodeId) throws IOException
+	public PAcceptor_Mod(String shard, String nodeId) throws IOException
 	{
 		super(nodeId);
 		this.shard = shard;
@@ -609,14 +609,14 @@ public class PAcceptor extends Node implements Runnable{
 	{
 		System.out.println("Handling Decide msg from "+msg.getSource());
 		if(pendingPaxosInstances.contains(msg.getUID())){
-			System.out.println("Pening paxos instance ");
+			System.out.println("Pending paxos instance ");
 			if(uidPaxosInstanceMap.containsKey(msg.getUID()))
 			{
 				PaxosInstance paxInstance = uidPaxosInstanceMap.get(msg.getUID());
 				paxInstance.addToDecideList(nodeAddress);
 				System.out.println("Decide list count "+paxInstance.getDecidesCount());
-				System.out.println(paxInstance.decides);
-				if(!paxInstance.isCommited)
+				System.out.println(" "+paxInstance.decides);
+				if( !paxInstance.isCommited)
 				{
 					paxInstance.isDecideSent = true;
 					paxInstance.addToDecideList(msg.getSource());
@@ -677,6 +677,9 @@ public class PAcceptor extends Node implements Runnable{
 				else{
 					//Paxos Instance already commited. No action to be taken
 					System.out.println("Pax instance already committed ::: ");
+					boolean isDone = false;
+					if( paxInstance.getDecidesCount() == acceptorsCount) 
+						isDone = true;
 					paxInstance.addToDecideList(msg.getSource());
 					System.out.println("No of decide count :: "+paxInstance.getDecidesCount()+"  acceptors count "+acceptorsCount);
 					/*if(paxInstance.getDecidesCount() < acceptorsCount )
@@ -684,9 +687,10 @@ public class PAcceptor extends Node implements Runnable{
 						PaxosMsg message = new PaxosMsg(nodeAddress, msg.getUID(), PaxosMsgType.DECIDE, paxInstance.getAcceptedValue());
 						sendDecideMsg(message);
 					}*/
-					if( ! (paxInstance.getDecidesCount() < acceptorsCount)) {
+					if( isDone) {
 						//every node has decided, remove from the pending list
 						System.out.println("Stopped sending DECIDE Messsage as all participants have sent DECIDE msg");
+					
 						pendingPaxosInstances.remove(msg.getUID());
 					}
 				}
@@ -713,8 +717,6 @@ public class PAcceptor extends Node implements Runnable{
 					uidPaxosInstanceMap.put(msg.getUID(), paxInstance);
 				}
 				else{
-					PaxosMsg message = new PaxosMsg(nodeAddress, msg.getUID(), PaxosMsgType.DECIDE, paxInstance.getAcceptedValue());
-					sendDecideMsg(message);
 					//every node has decided, remove from the pending list
 					pendingPaxosInstances.remove(msg.getUID());
 					uidTransMap.remove(msg.getUID());
@@ -1118,7 +1120,7 @@ public class PAcceptor extends Node implements Runnable{
 	{
 		if(args.length <= 1)
 			throw new IllegalArgumentException("Usage: PAcceptor <ShardID> <nodeId>");
-		PAcceptor acceptor = new PAcceptor(args[0], args[1]);
+		PAcceptor_Mod acceptor = new PAcceptor_Mod(args[0], args[1]);
 		new Thread(acceptor).start();
 		//acceptor.readStreamMessages();
 		acceptor.checkForAbortedTrans();

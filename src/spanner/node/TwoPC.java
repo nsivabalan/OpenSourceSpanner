@@ -139,6 +139,7 @@ public class TwoPC{
 		System.out.println("Received Prepare msg from participant &&&&& "+transClient);
 		if(pendingTrans.contains(trans.getTransactionID()))
 		{
+			//Fix me: necessity for this code block
 			if(!uidTransTypeMap.containsKey(trans.getTransactionID()))
 				uidTransTypeMap.put(trans.getTransactionID(), TransactionType.READINIT);
 			

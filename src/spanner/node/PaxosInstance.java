@@ -14,6 +14,7 @@ public class PaxosInstance{
 	HashSet<NodeProto> accepts;
 	HashSet<NodeProto> decides;
 	Long startTime;
+	boolean isDecideComplete;
 	BallotNumber highest;
 	boolean isAcceptSent ;
 	boolean isDecideSent ;
@@ -41,6 +42,18 @@ public class PaxosInstance{
 	}
 	
 	
+	public PaxosInstance(String uid2, BallotNumber ballotNumber,
+			BallotNumber acceptNo, ElementsSetProto acceptValue) {
+			this.uid = uid2;
+			this.ballotNo = ballotNumber;
+			this.acceptedNumber = acceptNo;
+			this.acceptedValue = acceptValue;
+			this.acks = new HashSet<NodeProto>();
+			this.highest = null;
+			this.accepts = new HashSet<NodeProto>();
+			this.decides = new HashSet<NodeProto>();
+	}
+
 	public boolean isAcceptSent()
 	{
 		return this.isAcceptSent;

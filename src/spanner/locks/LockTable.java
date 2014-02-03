@@ -56,10 +56,14 @@ public class LockTable {
 	
 	public void releaseLock(String row, String uid)
 	{
-		if(!lockTable.containsKey(row))
-			throw new IllegalStateException("No read lock found for the row");
-		if(!lockTable.get(row).equalsIgnoreCase(uid))
-			throw new IllegalStateException("Read lock for the row is acquired by a different transaction");
+		
+		/*if(!lockTable.containsKey(row))
+			throw new IllegalStateException("No read lock found for the row");*/
+		
+		if(lockTable.containsKey(row) && !lockTable.get(row).equalsIgnoreCase(uid)){
+		//	System.out.println("Expected lock value "+uid);
+			throw new IllegalStateException("Read lock for the row is acquired by a different transaction "+lockTable.get(row));
+		}
 		else
 			lockTable.remove(row);
 	}

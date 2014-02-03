@@ -146,16 +146,18 @@ public class TransClient extends Node implements Runnable{
 			for(PartitionServerElementProto partitionServer : trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
 			{
 				NodeProto dest = partitionServer.getPartitionServer().getHost();
+				//Fix me: just  send trans id
 				sendClientReadLockMessage(dest, trans, partitionServer.getElements());
 			}
-			TransactionProto updatedTrans = TransactionProto.newBuilder()
+			//Fix me: check why this block is req
+		/*	TransactionProto updatedTrans = TransactionProto.newBuilder()
 					.setTransactionID(transaction.getTransactionID())
 					.setTransactionStatus(TransactionStatusProto.ACTIVE)
 					.setWriteSet(transaction.getWriteSet())
 					.setReadSetServerToRecordMappings(transaction.getReadSetServerToRecordMappings())
 					.setWriteSetServerToRecordMappings(transaction.getWriteSetServerToRecordMappings())
-					.build();
-			transStatus.trans = updatedTrans;
+					.build();*/
+			//transStatus.trans = updatedTrans;
 		}
 		else{
 			transStatus.isReadLockAcquired = true;
