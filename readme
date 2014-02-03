@@ -8,3 +8,17 @@ UserClient
 MDService
 
 
+Sample execution:
+
+java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S1 1
+java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S1 2
+java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S1 3
+java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S2 4
+java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S2 5
+java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S2 6
+
+java -Djava.library.path=/usr/local/lib spanner.metadataservice.MDService
+java -Djava.library.path=/usr/local/lib spanner.node.TransClient client1 12345
+java -Djava.library.path=/usr/local/lib spanner.node.UserClient client2 13254
+
+//inputs from UserClient
