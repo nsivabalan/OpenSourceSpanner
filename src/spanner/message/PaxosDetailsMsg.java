@@ -60,7 +60,7 @@ public class PaxosDetailsMsg extends MessageBase{
 	@Override
 	public String toString() {
 		StringBuffer bf = new StringBuffer();
-		bf.append("Source - "+source);
+		bf.append("Source - "+source.getHost()+":"+this.source.getPort());
 		if(shardID != null)
 			bf.append("Shard ID - "+this.shardID);
 		if(shardLeader != null)

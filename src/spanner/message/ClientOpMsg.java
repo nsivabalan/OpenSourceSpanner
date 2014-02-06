@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.UUID;
 
 import spanner.message.MessageBase;
+import spanner.protos.Protos.ColElementProto;
+import spanner.protos.Protos.ElementProto;
 import spanner.protos.Protos.NodeProto;
 import spanner.protos.Protos.TransactionProto;
 
@@ -38,9 +40,27 @@ public class ClientOpMsg extends MessageBase{
 		bf.append(this.getClass().getName() + " - " + this.msgType);
 		bf.append("\n Source - " + this.source.getHost()+" "+this.source.getPort());
 		bf.append("\n UID - " + this.trans.getTransactionID());		
-		bf.append("\n ReadSet - " + this.trans.getReadSet());
+		bf.append("\n ReadSet :: \n");
+		for(ElementProto elementProto:  this.trans.getReadSet().getElementsList())
+		{
+			String temp = elementProto.getRow()+":";
+			for(ColElementProto colElemProto: elementProto.getColsList())
+			{
+				temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
+			}
+			bf.append(temp+"\n");
+		}
 		bf.append("\n Is ReadLock Acquired - "+this.isReadLock);
-		bf.append("\n WriteSet - "+ this.trans.getWriteSet());
+		bf.append("\n WriteSet :: \n");
+		for(ElementProto elementProto:  this.trans.getWriteSet().getElementsList())
+		{
+			String temp = elementProto.getRow()+":";
+			for(ColElementProto colElemProto: elementProto.getColsList())
+			{
+				temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
+			}
+			bf.append(temp+"\n");
+		}
 		bf.append("\n");
 		
 		return bf.toString();

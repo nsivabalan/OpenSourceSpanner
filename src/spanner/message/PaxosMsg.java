@@ -5,6 +5,8 @@ import java.util.UUID;
 
 import spanner.message.MessageBase;
 import spanner.node.BallotNumber;
+import spanner.protos.Protos.ColElementProto;
+import spanner.protos.Protos.ElementProto;
 import spanner.protos.Protos.ElementsSetProto;
 import spanner.protos.Protos.NodeProto;
 
@@ -119,15 +121,24 @@ public class PaxosMsg extends MessageBase{
 		
 		bf.append(this.getClass().getName() + " - " + this.type);
 		bf.append("\nUID - "+this.uidstr);
-		bf.append("\n Source - " + this.source);
+		bf.append("\n Source - " + this.source.getHost()+":"+this.source.getPort());
 		bf.append("\n MsgType - " + this.type);
 		if(ballotNo != null)
 			bf.append("\n Ballot Number - "+ballotNo);
 		if(acceptNo != null)
 			bf.append("\b Accept Number - "+acceptNo);
-		if(acceptValue != null)
-			bf.append("\b Accept Value - "+acceptValue);
-		bf.append("\n");
+		if(acceptValue != null){
+			bf.append("\n Accept Value :: ");
+			for(ElementProto elementProto:  acceptValue.getElementsList())
+			{
+				String temp = elementProto.getRow()+":";
+				for(ColElementProto colElemProto: elementProto.getColsList())
+				{
+					temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
+				}
+				bf.append(temp+"\n");
+			}
+		}
 		
 		return bf.toString();
 	}

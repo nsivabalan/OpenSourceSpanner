@@ -74,13 +74,13 @@ public class MetaDataMsg extends MessageBase{
 	@Override
 	public String toString() {
 		StringBuffer bf = new StringBuffer();
-		bf.append("Source - "+source);
+		bf.append("Source - "+source.getHost()+":"+this.source.getPort());
 		if(uid != null)
 			bf.append("UID - "+this.transID);
 		if(readSet != null)
-		bf.append("ReadSet - "+readSet);
+		bf.append("ReadSet :: "+readSet);
 		if(writeSet != null)
-		bf.append("WriteSet - "+writeSet);
+		bf.append("WriteSet :: "+writeSet);
 		if(transaction != null)
 			bf.append("Transaction - "+transaction);
 		

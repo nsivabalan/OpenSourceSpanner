@@ -358,11 +358,14 @@ public class TransClient extends Node implements Runnable{
 	{
 		sendTwoPCInitMessagetoTPC( twoPC, trans);
 		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {
+			System.out.println("Sleeping for 5 secs ::: ");
+			Thread.sleep(5000);
+			System.out.println("Woke up from sleep. Initiating TPC among all participants");
+		} catch (InterruptedException e1) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			e1.printStackTrace();
 		}
+		
 		for(PartitionServerElementProto partitionServer : trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
 		{
 			NodeProto dest = partitionServer.getPartitionServer().getHost();

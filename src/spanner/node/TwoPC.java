@@ -121,22 +121,25 @@ public class TwoPC{
 
 	public void ProcessInfoMessage(TwoPCMsg message)
 	{
+		System.out.println("--------------------- TWO PC --------------------- start -------------------- ");
 		NodeProto transClient= message.getSource();
 		TransactionProto trans = message.getTransaction();
-		System.out.println("Received Prepare msg from client &&&&& "+transClient);
+		System.out.println("Received INFO msg from client &&&&& "+transClient.getHost()+":"+transClient.getPort());
 		TransactionStatus transStatus = new TransactionStatus(transClient, trans);
 		System.out.println(" RS :: "+trans.getReadSet()+"\n WS ::"+trans.getWriteSet());
 		uidTransactionStatusMap.put(trans.getTransactionID(), transStatus);
 		System.out.println("Waiting for prepare ack from participants ");
 		uidTransTypeMap.put(trans.getTransactionID(), TransactionType.WRITEINIT);
 		pendingTrans.add(trans.getTransactionID());
+		System.out.println("--------------------- TWO PC --------------------- end -------------------- ");
 	}
 
 	public void ProcessPrepareMessage(TwoPCMsg message) throws IOException
 	{
+		System.out.println("--------------------- TWO PC --------------------- start -------------------- ");
 		NodeProto transClient= message.getSource();
 		TransactionProto trans = message.getTransaction();
-		System.out.println("Received Prepare msg from participant &&&&& "+transClient);
+		System.out.println("Received Prepare msg from participant &&&&& "+transClient.getHost()+":"+transClient.getPort());
 		if(pendingTrans.contains(trans.getTransactionID()))
 		{
 			//Fix me: necessity for this code block
@@ -150,6 +153,14 @@ public class TwoPC{
 			if(transStatus.paritcipantListPrepare.size() == transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementCount())
 			{
 				System.out.println("Received Prepare msg from all participants &&&&&&&&&& ");
+				/*try {
+					System.out.println("Sleeping for a min ########################### ");
+					Thread.sleep(60000);
+					System.out.println("Woke up. Sending Commit msg to all participants &&&&&&&&&&&&&& ");
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}*/
 				//	TwoPCMsg commit_init = new TwoPCMsg(nodeAddress, trans, TwoPCMsgType.COMMIT);
 				for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
 				{
@@ -164,7 +175,7 @@ public class TwoPC{
 			}
 		}
 		else{
-			System.out.println("Already aborted. No action taken. Press enter to proceed");
+			System.out.println("Already aborted. No action taken");
 			if(pendingTrans.contains(trans.getTransactionID()))
 			{
 				pendingTrans.remove(trans.getTransactionID());
@@ -177,6 +188,7 @@ public class TwoPC{
 		}
 		else
 			System.out.println("Already decision taken on the transaction. So no action taken");
+		System.out.println("--------------------- TWO PC --------------------- end -------------------- ");
 	}
 
 	private void sendCommitInitMessage(NodeProto source, NodeProto dest, TransactionProto transaction , ElementsSetProto elements)
@@ -207,9 +219,8 @@ public class TwoPC{
 	private void SendCommitInitMessage(TwoPCMsg message, NodeProto dest)
 	{
 		System.out.println("Sending Commit Init msg - "+message.getTransaction().getTransactionID());		
-		LOGGER.log(Level.FINE, new String("Sent Commit Init msg to Participant- "+dest));
+		LOGGER.log(Level.FINE, new String("Sent Commit Init msg to Participant- "+dest.getHost()+":"+dest.getPort()));
 		socketPush = context.socket(ZMQ.PUSH);
-		System.out.println(" "+dest.getHost()+":"+dest.getPort());
 		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
@@ -219,6 +230,7 @@ public class TwoPC{
 
 	public void ProcessCommitMessage(TwoPCMsg message) throws IOException
 	{
+		System.out.println("--------------------- TWO PC --------------------- start -------------------- ");
 		NodeProto participant = message.getSource();
 		TransactionProto trans = message.getTransaction();
 		
@@ -237,8 +249,8 @@ public class TwoPC{
 					.setReadSet(transStatus.trans.getReadSet())
 					.setWriteSet(transStatus.trans.getWriteSet())
 					.build();
-			System.out.println(" Prepared commit message. Press enter to send");
-			br.readLine();
+			//System.out.println(" Prepared commit message. Press enter to send");
+			//br.readLine();
 			pendingTrans.remove(trans.getTransactionID());
 			TwoPCMsg commit_response = new TwoPCMsg(nodeAddress, clientResponse, TwoPCMsgType.COMMIT);
 			
@@ -246,11 +258,12 @@ public class TwoPC{
 			System.out.println("Sending Commit msg to Trans Client- "+trans.getTransactionID());		
 			LOGGER.log(Level.FINE, new String("Sent Commit msg to Trans Client- "+trans.getTransactionID()));
 		}
-
+		System.out.println("--------------------- TWO PC --------------------- end -------------------- ");
 	}
 
 	public void ProcessAbortMessage(TwoPCMsg message) throws IOException
 	{
+		System.out.println("--------------------- TWO PC --------------------- start -------------------- ");
 		NodeProto participant = message.getSource();
 		TransactionProto trans = message.getTransaction();
 
@@ -259,7 +272,7 @@ public class TwoPC{
 			System.out.println("Received abort message from one participant for first time ");
 			transStatus.transState = TransactionType.ABORT;
 			transStatus.paritcipantListAbort.add(participant);
-			System.out.println("Sending abort messages to all participants. Press enter to proceed (to send abort msg to rest participants)");
+			System.out.println("Sending abort messages to all participants");
 			br.readLine();
 			//	TwoPCMsg commit_init = new TwoPCMsg(nodeAddress, trans, TwoPCMsgType.COMMIT);
 			for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
@@ -275,8 +288,8 @@ public class TwoPC{
 			System.out.println("Actual Count "+transStatus.paritcipantListAbort.size());
 			if(transStatus.paritcipantListAbort.size() == transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementCount())
 			{
-				System.out.println("Received abort messages from  all participants. Press enter to proceed to send response to trans  client ");
-				br.readLine();
+				System.out.println("Received abort messages from  all participants");
+				//br.readLine();
 				TwoPCMsg commit_response = new TwoPCMsg(nodeAddress, trans, TwoPCMsgType.ABORT);
 				pendingTrans.remove(trans.getTransactionID());
 				SendTwoPCMessage(commit_response, transStatus.source);
@@ -285,6 +298,7 @@ public class TwoPC{
 			}
 		}
 		uidTransactionStatusMap.put(trans.getTransactionID(), transStatus);
+		System.out.println("--------------------- TWO PC --------------------- end -------------------- ");
 	}
 
 	private void ProcessBcastMessage(BcastMsg message)
@@ -300,6 +314,7 @@ public class TwoPC{
 
 	public void ProcessClientReadMessage(ClientOpMsg message)
 	{
+		System.out.println("--------------------- TWO PC --------------------- start -------------------- ");
 		NodeProto transClient = message.getSource();
 		TransactionProto trans = message.getTransaction();
 
@@ -318,11 +333,12 @@ public class TwoPC{
 		SendClientMessage(read_response, transClient);
 		System.out.println("Sent Read Data for UID - "+trans.getTransactionID());		
 		LOGGER.log(Level.FINE, new String("Sent Read Data for UID - "+trans.getTransactionID()));
-
+		System.out.println("--------------------- TWO PC --------------------- end -------------------- ");
 	}
 
 	public void ProcessClientWriteMessage(ClientOpMsg message)
 	{
+		System.out.println("--------------------- TWO PC --------------------- start -------------------- ");
 		NodeProto twoPC = message.getSource();
 		TransactionProto trans = message.getTransaction();
 
@@ -340,7 +356,7 @@ public class TwoPC{
 		SendTwoPCMessage(write_response, twoPC);
 		System.out.println("Sending Prepare Ack for Write Data for UID - "+trans.getTransactionID());		
 		LOGGER.log(Level.FINE, new String("Sent Prepare Ack for Write Data for UID - "+trans.getTransactionID()));
-
+		System.out.println("--------------------- TWO PC --------------------- end -------------------- ");
 	}
 
 	private void ProcessClientMessage(ClientOpMsg message)
@@ -544,7 +560,7 @@ public class TwoPC{
 	private void SendTwoPCMessage(TwoPCMsg message, NodeProto dest)
 	{
 		//Print msg
-		System.out.println("Sent " + message);
+		System.out.println("Sending TwoPCMsg " + message+" to "+dest.getHost()+":"+dest.getPort());
 		this.AddLogEntry("Sent "+message, Level.INFO);
 
 		ZMQ.Socket socket = context.socket(ZMQ.PUSH);
@@ -557,7 +573,7 @@ public class TwoPC{
 	private void SendClientMessage(ClientOpMsg message, NodeProto dest)
 	{
 		//Print msg
-		System.out.println("Sent " + message);
+		System.out.println("Sending ClientOpMsg " + message+" to "+dest.getHost()+":"+dest.getPort());
 		this.AddLogEntry("Sent "+message, Level.INFO);
 
 		ZMQ.Socket socket = context.socket(ZMQ.PUSH);

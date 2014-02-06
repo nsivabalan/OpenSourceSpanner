@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.UUID;
 
 import spanner.message.MessageBase;
+import spanner.protos.Protos.ColElementProto;
+import spanner.protos.Protos.ElementProto;
 import spanner.protos.Protos.NodeProto;
 import spanner.protos.Protos.TransactionProto;
 
@@ -60,10 +62,30 @@ public class TwoPCMsg extends MessageBase{
 		StringBuilder bf = new StringBuilder();
 		
 		bf.append("\n"+this.getClass().getName() + " - " + this.type);
-		bf.append("\n Source - " + this.source);
+		bf.append("\n Source - " + this.source.getHost()+":"+this.source.getPort());
 		bf.append("\n UID - " + this.trans.getTransactionID());
-		bf.append("\n readSet - " + this.trans.getReadSet());
-		bf.append("\n writeSet - " + this.trans.getWriteSet());
+		bf.append("\n ReadSet :: \n");
+		for(ElementProto elementProto:  this.trans.getReadSet().getElementsList())
+		{
+			String temp = elementProto.getRow()+":";
+			for(ColElementProto colElemProto: elementProto.getColsList())
+			{
+				temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
+			}
+			bf.append(temp+"\n");
+		}
+		
+		bf.append("\n WriteSet :: \n");
+		for(ElementProto elementProto:  this.trans.getWriteSet().getElementsList())
+		{
+			String temp = elementProto.getRow()+":";
+			for(ColElementProto colElemProto: elementProto.getColsList())
+			{
+				temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
+			}
+			bf.append(temp+"\n");
+		}
+		
 		bf.append("\n");
 		
 		return bf.toString();
