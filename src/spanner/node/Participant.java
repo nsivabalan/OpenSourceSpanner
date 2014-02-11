@@ -17,7 +17,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 
-import spanner.locks.LockTable;
+import spanner.locks.LockTableOld;
 import spanner.message.BcastMsg;
 import spanner.message.ClientOpMsg;
 import spanner.message.PaxosDetailsMsg;
@@ -57,7 +57,7 @@ public class Participant extends Node implements Runnable{
 	NodeProto nodeAddress = null;
 	ArrayList<NodeProto> acceptors;
 	TwoPC twoPhaseCoordinator = null;
-	LockTable lockTable = null;
+	LockTableOld lockTable = null;
 	BallotNumber ballotNo;
 	String shard;
 	int acceptNo;
@@ -114,7 +114,7 @@ public class Participant extends Node implements Runnable{
 		pendingTransactions = new ArrayList<UUID>();
 		this.uidTransactionStatusMap = new LinkedHashMap<UUID, TransactionStatus>();
 		localResource = new ResourceHM(this.LOGGER);
-		lockTable = new LockTable();
+		lockTable = new LockTableOld();
 		InetAddress addr = InetAddress.getLocalHost();
 		nodeAddress = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(Integer.parseInt(hostdetails[1])).build();
 		System.out.println("Participant node address ****** "+nodeAddress);

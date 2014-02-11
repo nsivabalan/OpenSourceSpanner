@@ -30,7 +30,7 @@ import spanner.common.Common.PaxosDetailsMsgType;
 import spanner.common.Common.PaxosLeaderState;
 import spanner.common.Common.PaxosMsgType;
 import spanner.common.Common.TwoPCMsgType;
-import spanner.locks.LockTable;
+import spanner.locks.LockTableOld;
 import spanner.message.ClientOpMsg;
 import spanner.message.PaxosDetailsMsg;
 import spanner.message.PaxosMsg;
@@ -57,7 +57,7 @@ public class PAcceptor extends Node implements Runnable{
 	String shard ;
 	PLeaderState state ;
 	ArrayList<NodeProto> acceptors;
-	LockTable lockTable = null;
+	LockTableOld lockTable = null;
 	private static Logger PAXOSLOG = null;
 	int acceptorsCount = 0;
 	BallotNumber ballotNo = null;
@@ -100,7 +100,7 @@ public class PAcceptor extends Node implements Runnable{
 		System.out.println("Participant node address ****** "+nodeAddress);
 		String[] mds = Common.getProperty("mds").split(":");
 		metadataService = NodeProto.newBuilder().setHost(mds[0]).setPort(Integer.parseInt(mds[1])).build();
-		lockTable = new LockTable();
+		lockTable = new LockTableOld();
 		pendingPaxosInstances = new HashSet<String>();
 		uidTransMap = new HashMap<String, TransactionSource>();
 		localResource = new ResourceHM(this.LOGGER);
