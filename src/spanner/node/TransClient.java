@@ -227,16 +227,19 @@ public class TransClient extends Node implements Runnable{
 						ClientOpMsg message = (ClientOpMsg)msgwrap.getDeSerializedInnerMessage();
 						if(message.getMsgType() == ClientOPMsgType.READ_RESPONSE)
 						{
+							System.out.println("Processing Read Response ::::::: ");
 							ProcessReadResponse(message);
 						}
 						else{
+							System.out.println("Processing Client Op MSG ::::::: ");
 							ProcessClientOpMessage(message);
 						}
 					}
 					else if (msgwrap.getmessageclass() == TwoPCMsg.class)
 					{
+						System.out.println("Processing TwoPCMsg from TPC ::::::: ");
 						TwoPCMsg message = (TwoPCMsg)msgwrap.getDeSerializedInnerMessage();
-						System.out.println("Client Response "+message);
+						System.out.println("Client Response "+message+" >>>>>");
 						handleTwoPCResponse(message);
 					}
 				} catch (ClassNotFoundException e) {
@@ -422,7 +425,12 @@ public class TransClient extends Node implements Runnable{
 				.setReadSet(msg.getTransaction().getReadSet())
 				.setWriteSet(msg.getTransaction().getWriteSet())
 				.build();*/
-		ClientOpMsg message = new ClientOpMsg(clientNode, msg.getTransaction(), ClientOPMsgType.COMMIT);
+		ClientOpMsg message = null;
+		System.out.println("Msg Type ::::::: "+msg.getMsgType());
+		if(msg.getMsgType() == TwoPCMsgType.COMMIT)
+			message = new ClientOpMsg(clientNode, msg.getTransaction(), ClientOPMsgType.COMMIT);
+		else 
+			message = new ClientOpMsg(clientNode, msg.getTransaction(), ClientOPMsgType.ABORT);
 		SendClientResponse(clientMappings.get(msg.getTransaction().getTransactionID()), message);
 	}
 	

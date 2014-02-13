@@ -35,6 +35,7 @@ public class Common {
 	public static String tableName = "default_Table";
 	
 	public enum State {ACTIVE, PAUSED};
+	public enum ReplayMsgType {REQEUST, RESPONSE};
 	public enum TransactionType{ STARTED, READINIT, READDONE, WRITEINIT, COMMIT, ABORT, PREPARE_DONE};
 	public enum RequestType {PREPARE, COMMIT, ABORT};
 	public enum ClientOPMsgType{READ,WRITE,READ_RESPONSE,UNLOCK, COMMIT, RELEASE_RESOURCE, WRITE_RESPONSE,ABORT};
@@ -48,7 +49,8 @@ public class Common {
 	public enum PLeaderState{ACTIVE, INIT, DORMANT};
 	public enum AcceptorState{ACCEPT, COMMIT, COMMIT_ACK, ABORT, ABORT_ACK};
 	public enum TPCState{INIT, COMMIT, COMMIT_ACK, ABORT, ABORT_ACK};
-	public static final long TRANS_TIMEOUT = 100000;
+	public static final long TRANS_TIMEOUT = 40000;
+	public static final long TPC_TIMEOUT = 10000;
 	
 	public static String getProperty(String str)
 	{

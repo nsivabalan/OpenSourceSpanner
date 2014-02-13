@@ -53,7 +53,17 @@ public class PaxosInstance{
 			this.accepts = new HashSet<NodeProto>();
 			this.decides = new HashSet<NodeProto>();
 	}
-
+	
+	public void setUID(String uid)
+	{
+		this.uid = uid;
+	}
+	
+	public String getUID()
+	{
+		return this.uid;
+	}
+	
 	public boolean isAcceptSent()
 	{
 		return this.isAcceptSent;

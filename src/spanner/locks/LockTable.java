@@ -92,8 +92,9 @@ public class LockTable {
 			return true; // successful
 
 		} else {
-
-			if ( (lockHolder.getWriteLockHolder()==null) ||
+			//System.out.println("Write lock holder "+lockHolder.getWriteLockHolder().getTransactionId());
+			//System.out.println("lock holders time stamp : "+lockHolder.getWriteLockHolder().getTimestamp()+" cur time stamp "+System.currentTimeMillis()+" difference "+(System.currentTimeMillis()- lockHolder.getWriteLockHolder().getTimestamp()));
+			if ( (lockHolder.getWriteLockHolder()==null) || lockHolder.getWriteLockHolder().getTransactionId().equalsIgnoreCase(transactionId)||
 					(lockHolder.getWriteLockHolder().getTimestamp()<(System.currentTimeMillis()-2000)) ) {
 				lockHolder.setWriteLockHolder(new Lock(transactionId, System.currentTimeMillis()));
 				lockHolder.getReadLockHolders().clear();
