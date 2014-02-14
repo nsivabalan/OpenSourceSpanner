@@ -69,7 +69,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private static BufferedWriter bufferedWriter = null;
 	int acceptorsCount = 0;
 	BallotNumber ballotNo = null;
-	private HashMap<String, LogPositionDetail> uidTologLocationMap = null; 
+	private HashMap<String, Integer> uidTologPositionMap = null; 
 	private HashMap<Integer, String> logPostionToUIDMap = null;
 	private ConcurrentHashMap<String, PaxosInstance> uidPaxosInstanceMap = null;
 	private ConcurrentHashMap<Integer, PaxosInstance> logPositionToPaxInstanceMap = null;
@@ -127,7 +127,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		ballotNo = new BallotNumber(0, myId);
 		uidPaxosInstanceMap = new ConcurrentHashMap<String, PaxosInstance>();
 		logPositionToPaxInstanceMap = new ConcurrentHashMap<Integer, PaxosInstance>();
-		uidTologLocationMap = new HashMap<String, LogPositionDetail>();
+		uidTologPositionMap = new HashMap<String, Integer>();
 		logPostionToUIDMap = new HashMap<Integer, String>();
 		sendPaxosMsgRequestingAcceptors();
 		sendPaxosMsgRequestingLeader(clear);
@@ -434,40 +434,25 @@ public class PaxosAcceptor extends Node implements Runnable{
 
 				if(paxInstance.decides.size() == 0)
 				{
-					pendingPaxosInstances.remove(uid);
 					System.out.println("Total ACCEPTs haven't reached majority. Hence aborting the trans "+uid);
 					if(uid.startsWith("P")){
 						System.out.println("PREPARE txn "+uid+" hasn't reached majority. Releasing all locks obtained");
 						pendingPaxosInstances.remove(logPos);
 						releaseLocks(paxInstance.getAcceptedValue(), uid);
-						if(!uidPaxosInstanceMap.contains("A"+uid)){
-							dummyInstance.setAcceptedValue(paxInstance.getAcceptedValue());
-							dummyInstance.setUID("A"+uid.substring(1));
-							uidPaxosInstanceMap.put("A"+uid.substring(1), dummyInstance);
-							logPositionToPaxInstanceMap.put(uidTologLocationMap.get(uid).logPosition, paxInstance);
-							writeToPaxLogFile(uidTologLocationMap.get(uid).logPosition, "ABORTED", paxInstance.getAcceptedValue());
-						}
 					}
 					else if(uid.startsWith("C")){
 						System.out.println("COMMIT txn "+uid +" hasn't reached majority. Hence aborting the transaction");
-						paxInstance.isCommited();
 						uidPaxosInstanceMap.put(uid, paxInstance);
-						if(!uidPaxosInstanceMap.contains("A"+uid)){
-							dummyInstance.setUID("A"+uid.substring(1));
-							dummyInstance.setAcceptedValue(paxInstance.getAcceptedValue());
-							uidPaxosInstanceMap.put("A"+uid.substring(1), dummyInstance);
-							logPositionToPaxInstanceMap.put(uidTologLocationMap.get(uid).logPosition, paxInstance);
-							writeToPaxLogFile(uidTologLocationMap.get(uid).logPosition, "ABORTED", paxInstance.getAcceptedValue());
-						}
 						pendingPaxosInstances.remove(logPos);
 						releaseLocks(paxInstance.getAcceptedValue(), uid);
+						//FIX ME: check if paxos leader should respond to the TPC or rely on TPC timeouts
 						TwoPCMsg message = new TwoPCMsg(nodeAddress, uidTransMap.get(uid).getTrans(), TwoPCMsgType.ABORT, true);
 						SendTwoPCMessage(message, uidTransMap.get(uid).getSource());
-
 					}
 					else if(uid.startsWith("A"))
 					{
 						System.out.println("ABORT txn "+uid+" hasn't reached majority. No action taken");
+						pendingPaxosInstances.remove(logPos);
 					}
 				}
 			}
@@ -716,21 +701,23 @@ public class PaxosAcceptor extends Node implements Runnable{
 				//Already leader. Send Accept right Away
 				int newLogPosition = logCounter++;
 				System.out.println("!!!!!!!!!! client write msg ");
-				uidTologLocationMap.put("P"+trans.getTransactionID(), new LogPositionDetail(newLogPosition));
+				uidTologPositionMap.put("P"+trans.getTransactionID(), newLogPosition);
 				logPostionToUIDMap.put(newLogPosition, "P"+trans.getTransactionID());
 				PaxosInstance paxInstance = new PaxosInstance("P"+trans.getTransactionID(), ballotNo, trans.getWriteSet());
 				//paxInstanceToUIDMap.put("P"+trans.getTransactionID(), trans.getTransactionID());
-				uidPaxosInstanceMap.put("P"+trans.getTransactionID(), paxInstance);
+				//uidPaxosInstanceMap.put("P"+trans.getTransactionID(), paxInstance);
+				//logPositionToPaxInstanceMap.put(newLogPosition, paxInstance);
 				uidTransMap.put( "P"+trans.getTransactionID(), new TransactionSource(trans,msg.getSource(), TwoPCMsgType.PREPARE));
-
-				PaxosMsg message = new PaxosMsg(nodeAddress, "P"+trans.getTransactionID(),PaxosMsgType.ACCEPT, paxInstance.getBallotNumber(), trans.getWriteSet());
-				message.setLogPositionNumber(newLogPosition);
 				paxInstance.setAcceptSent();
 				paxInstance.setTimeStamp(new Date().getTime());
-				pendingPaxosInstances.add("P"+trans.getTransactionID());
-				paxInstance.setTimeStamp(new Date().getTime());
+				
 				paxInstance.addtoAcceptList(nodeAddress);
+				pendingPaxosInstances.add(newLogPosition);
+				uidPaxosInstanceMap.put("P"+trans.getTransactionID(), paxInstance);
+				logPositionToPaxInstanceMap.put(newLogPosition, paxInstance);
 				System.out.println("Sending accept msgs to all acceptors ");
+				PaxosMsg message = new PaxosMsg(nodeAddress, "P"+trans.getTransactionID(),PaxosMsgType.ACCEPT, paxInstance.getBallotNumber(), trans.getWriteSet());
+				message.setLogPositionNumber(newLogPosition);
 				sendAcceptMsg(message);
 			}
 			else{
@@ -748,7 +735,30 @@ public class PaxosAcceptor extends Node implements Runnable{
 		}
 	}
 
+	
+	private void initiatePreparePhase()
+	{
+		int newLogPosition = logCounter;
+		PaxosInstance paxInstance = new PaxosInstance("-1", ballotNo);
+		
+	}
 
+	
+	
+	private void SendPrepareMessage(PaxosMsg message)
+	{
+		SendMessageToAcceptors(message);
+	}
+	
+	private void SendMessageToAcceptors(PaxosMsg msg)
+	{
+		for(NodeProto node: acceptors)
+		{
+			if(!nodeAddress.equals(node))
+				sendPaxosMsg(node, msg);
+		}
+	}
+	
 	private void handleTwoPCCommitMessage(TwoPCMsg msg)
 	{
 		System.out.println("IsLeader --------- "+isLeader);
@@ -773,19 +783,19 @@ public class PaxosAcceptor extends Node implements Runnable{
 				//Already leader. Send Accept right Away
 				int newLogPosition = logCounter++;
 				System.out.println("!!!!!!!!!! Two PC commit msg");
-				uidTologLocationMap.put("C"+trans.getTransactionID(), new LogPositionDetail(newLogPosition));
+				uidTologPositionMap.put("C"+trans.getTransactionID(), newLogPosition);
 				logPostionToUIDMap.put(newLogPosition, "C"+trans.getTransactionID());
 				PaxosInstance paxInstance = new PaxosInstance("C"+trans.getTransactionID(), ballotNo, trans.getWriteSet());
-				//paxInstanceToUIDMap.put("P"+trans.getTransactionID(), trans.getTransactionID());
-				uidPaxosInstanceMap.put("C"+trans.getTransactionID(), paxInstance);
 				uidTransMap.put( "C"+trans.getTransactionID(), new TransactionSource(trans,msg.getSource(), TwoPCMsgType.COMMIT));
 
-				PaxosMsg message = new PaxosMsg(nodeAddress, "C"+trans.getTransactionID(),PaxosMsgType.ACCEPT, paxInstance.getBallotNumber(), trans.getWriteSet());
-				message.setLogPositionNumber(newLogPosition);
 				paxInstance.setAcceptSent();
 				paxInstance.setTimeStamp(new Date().getTime());
-				//pendingPaxosInstances.add("C"+trans.getTransactionID());
+				pendingPaxosInstances.add(newLogPosition);
 				paxInstance.addtoAcceptList(nodeAddress);
+				uidPaxosInstanceMap.put("C"+trans.getTransactionID(), paxInstance);
+				logPositionToPaxInstanceMap.put(newLogPosition, paxInstance);
+				PaxosMsg message = new PaxosMsg(nodeAddress, "C"+trans.getTransactionID(),PaxosMsgType.ACCEPT, paxInstance.getBallotNumber(), trans.getWriteSet());
+				message.setLogPositionNumber(newLogPosition);
 				System.out.println("Sending accept msgs to all acceptors ");
 				sendAcceptMsg(message);
 			}
@@ -814,21 +824,18 @@ public class PaxosAcceptor extends Node implements Runnable{
 			TransactionProto trans = msg.getTransaction();
 			String uid = trans.getTransactionID();
 			if(!uidPaxosInstanceMap.contains("A"+uid)){
-				if(pendingPaxosInstances.contains("P"+uid))
+				
+				
+				if(pendingPaxosInstances.contains(uidTologPositionMap.get("P"+uid)))
 				{
 					System.out.println("Aborting paxInstance for PREPARE for the same trans ");
-					pendingPaxosInstances.remove("P"+uid);
-
-					//	writeToPaxLogFile(uidTologLocationMap.get("P"+uid).logPosition, "ABORTED", trans.getWriteSet());
-					//uidTransMap.put( "A"+trans.getTransactionID(), new TransactionSource(trans,msg.getSource(), TwoPCMsgType.ABORT));
-					//	lockTable.releaseLocksOfAborted(trans);
-
+					pendingPaxosInstances.remove(uidTologPositionMap.get("P"+uid));
 				}
 
 				System.out.println("New Abort trans from ---------- "+msg.getSource().getHost()+":"+msg.getSource().getPort());
 				System.out.println("!!!!!!!!!! TwoPC ABORT msg");
 				int newLogPosition = logCounter++;
-				uidTologLocationMap.put("A"+trans.getTransactionID(), new LogPositionDetail(newLogPosition));
+				uidTologPositionMap.put("A"+trans.getTransactionID(), newLogPosition);
 				logPostionToUIDMap.put(newLogPosition, "A"+trans.getTransactionID());
 				writeToPaxLogFile(newLogPosition, "ABORTED", trans.getWriteSet());
 				PaxosInstance paxInstance = new PaxosInstance("A"+trans.getTransactionID(), ballotNo, trans.getWriteSet());
@@ -837,10 +844,12 @@ public class PaxosAcceptor extends Node implements Runnable{
 				lockTable.releaseLocksOfAborted(trans);
 				paxInstance.setAcceptSent();
 				paxInstance.setTimeStamp(new Date().getTime());
-				pendingPaxosInstances.add("A"+trans.getTransactionID());
+				pendingPaxosInstances.add(newLogPosition);
 				paxInstance.addtoAcceptList(nodeAddress);
+				
 				System.out.println("Adding paxIsntace for Abort ******** "+paxInstance);
 				uidPaxosInstanceMap.put("A"+trans.getTransactionID(), paxInstance);
+				logPositionToPaxInstanceMap.put(newLogPosition, paxInstance);
 				PaxosMsg message = new PaxosMsg(nodeAddress, "A"+trans.getTransactionID(),PaxosMsgType.ACCEPT, paxInstance.getBallotNumber(), trans.getWriteSet());
 				message.setLogPositionNumber(newLogPosition);
 				System.out.println("Sending accept msgs to all acceptors ");
@@ -860,11 +869,21 @@ public class PaxosAcceptor extends Node implements Runnable{
 	{
 		String uid = msg.getUID();
 		System.out.println("$$$$$$$$$$$$$$$ Handling DECIDE msg for "+uid+"  from :: "+msg.getSource().getHost()+":"+msg.getSource().getPort()+" $$$$$$$$$$$$ ");
-		if(uidPaxosInstanceMap.containsKey(uid))
+		
+		/*System.out.println("List of entires in logPositiontoPI map");
+		for(Integer pos: logPositionToPaxInstanceMap.keySet())
+		{
+			System.out.println(" "+pos+" "+logPositionToPaxInstanceMap.get(pos));
+		}
+		System.out.println("Done ");*/ 
+		
+		System.out.println(" logPosition "+msg.getLogPositionNumber());
+		if(logPositionToPaxInstanceMap.containsKey(msg.getLogPositionNumber()))
 		{
 			//System.out.println("Handling decide msg inside 1st if loop");
 			//System.out.println("Already ACCEPT sent to all. Adding to the list of acceptors");
-			PaxosInstance paxInstance = uidPaxosInstanceMap.get(uid);
+			PaxosInstance paxInstance = logPositionToPaxInstanceMap.get(msg.getLogPositionNumber());
+			System.out.println(" paxIsntance "+paxInstance);
 			int prevCount = paxInstance.decides.size();
 			paxInstance.decides.add(msg.getSource());
 			System.out.print("List of decides <<<<< ");
@@ -895,85 +914,13 @@ public class PaxosAcceptor extends Node implements Runnable{
 					}
 					paxInstance.setCommited();
 					uidPaxosInstanceMap.put(uid, paxInstance);
-					pendingPaxosInstances.remove(uid);
+					logPositionToPaxInstanceMap.put(msg.getLogPositionNumber(), paxInstance);
+					pendingPaxosInstances.remove(msg.getLogPositionNumber());
 					initiateDecide(msg);
-
-					/*if(uid.startsWith("C")){
-							Boolean isWritten = localResource.WriteResource(paxInstance.getAcceptedValue());
-
-							if(isWritten){
-								writeToPaxLogFile(uidTologLocationMap.get(uid).logPosition, "COMMITED", paxInstance.getAcceptedValue());
-								//FIX ME: send DECIDE msg to participants
-								PaxosMsg message = new PaxosMsg(nodeAddress, uid, PaxosMsgType.DECIDE, msg.getBallotNumber(), msg.getAcceptValue());
-								message.setLogPositionNumber(msg.getLogPositionNumber());
-								sendDecideMsg(message);
-
-								if(isLeader)
-								{
-									//send response for the Paxos Instance
-									System.out.println("Leader Decided on a value(Commited), sent response to TPC ");
-									sendPaxosInstanceResponse(msg);
-									//FIX ME: release read locks for the transaction
-									lockTable.releaseReadLocks( uidTransMap.get(uid.substring(1)).trans.getReadSet(), uid.substring(1), true);
-								}
-								System.out.println("Releasing the resources");
-								lockTable.releaseWriteLocks(msg.getAcceptValue(), uid.substring(1), true);
-								//releaseLocks(elementsSetProto, uid), msg.getUID().substring(1));
-
-
-							}
-							else{
-								writeToPaxLogFile(uidTologLocationMap.get(uid).logPosition, "ABORTED", paxInstance.getAcceptedValue());
-								//send client response
-								///FIX me . send to TPC
-								if(isLeader){
-									//FIX ME: check if trans id is well formed
-									TransactionSource tempTransSource = uidTransMap.get(msg.getUID().substring(1));
-									System.out.println("Sending client response(ABORT) to "+tempTransSource.getSource());
-									//ClientOpMsg message = new ClientOpMsg(nodeAddress, tempTransSource.getTrans(), ClientOPMsgType.ABORT);
-									//SendClientMessage(message, tempTransSource.getSource());
-									lockTable.releaseLocks(tempTransSource.trans);
-									TwoPCMsg message = new TwoPCMsg(nodeAddress, tempTransSource.getTrans(), TwoPCMsgType.ABORT, true);
-									SendTwoPCMessage(message, msg.getSource());
-								}
-							}
-						}
-						else if(uid.startsWith("P")){//Pax instance for PREPARE phase. Just obtained read locks
-							//FIX ME: send DECIDE msg to participants
-							writeToPaxLogFile(uidTologLocationMap.get(uid).logPosition, "PREPARED", paxInstance.getAcceptedValue());
-							PaxosMsg message = new PaxosMsg(nodeAddress, uid, PaxosMsgType.DECIDE, msg.getBallotNumber(), msg.getAcceptValue());
-							message.setLogPositionNumber(msg.getLogPositionNumber());
-							sendDecideMsg(message);
-
-							if(isLeader){
-								System.out.println("Leader Done with PREPARE phase, sent response to TPC ");
-								sendPaxosInstanceResponse(msg);
-							}
-
-
-						}
-						else if(uid.startsWith("A"))
-						{
-							//FIX ME: send DECIDE msg to participants
-							//writeToPaxLogFile(uidTologLocationMap.get(uid).logPosition, "ABORTED", paxInstance.getAcceptedValue());
-							PaxosMsg message = new PaxosMsg(nodeAddress, uid, PaxosMsgType.DECIDE, msg.getBallotNumber(), msg.getAcceptValue());
-							message.setLogPositionNumber(msg.getLogPositionNumber());
-							sendDecideMsg(message);
-							lockTable.releaseWriteLocks(msg.getAcceptValue(), uid.substring(1), false);
-							if(isLeader){
-								System.out.println("Leader Done with ABORT, sent response to TPC ");
-								sendPaxosInstanceResponse(msg);
-								lockTable.releaseReadLocks(uidTransMap.get(uid.substring(1)).trans.getReadSet(), uid.substring(1), false);
-							}
-						}*/
-
-
 				}
 				else{
 					System.out.println("Reached majority and already DECIDED. No action taken");
-
 				}
-
 			}
 			else{
 				System.out.println("Already seen DECIDE from the same acceptor &&&&& ");
@@ -982,8 +929,8 @@ public class PaxosAcceptor extends Node implements Runnable{
 		else{
 			System.out.println("First time seeing DECIDE msg. DECIDING the value and sending DECIDE to all");
 			PaxosInstance paxInstance  = null;
-			if(uidPaxosInstanceMap.containsKey(uid)){
-				paxInstance = uidPaxosInstanceMap.get(uid);
+			if(logPositionToPaxInstanceMap.containsKey(msg.getLogPositionNumber())){
+				paxInstance = logPositionToPaxInstanceMap.get(msg.getLogPositionNumber());
 			}
 			else{
 				paxInstance = new PaxosInstance(uid, msg.getBallotNumber(), msg.getAcceptNo(), msg.getAcceptValue());
@@ -996,31 +943,21 @@ public class PaxosAcceptor extends Node implements Runnable{
 			paxInstance.isDecideSent = true;
 			paxInstance.isCommited = true;
 			uidPaxosInstanceMap.put(uid, paxInstance );
-			if(pendingPaxosInstances.contains(uid))
-				pendingPaxosInstances.remove(uid);
+			logPositionToPaxInstanceMap.put(msg.getLogPositionNumber(), paxInstance);
+			if(pendingPaxosInstances.contains(msg.getLogPositionNumber()))
+				pendingPaxosInstances.remove(msg.getLogPositionNumber());
 			initiateDecide(msg);
-
 		}
-
-
 	}
 
 	private synchronized void handlePaxosAcceptMessage(PaxosMsg msg)
 	{
 		String uid = msg.getUID();
 		System.out.println("Handling ACCEPT msg for "+uid+" from :: "+msg.getSource().getHost()+":"+msg.getSource().getPort());
-		if(logPostionToUIDMap.containsKey(msg.getLogPositionNumber())){
-			PaxosInstance paxInstance = uidPaxosInstanceMap.get(logPostionToUIDMap.get(msg.getLogPositionNumber()));
-			if((msg.getBallotNumber().compareTo(paxInstance.getBallotNumber())) >=0 ){
-				
-				
-			}
-		}
-		else{
-			if(uidPaxosInstanceMap.containsKey(uid))
-			{
-
-				System.out.println("Already ACCEPT sent to all. Adding to the list of acceptors");
+		
+			if(logPostionToUIDMap.containsKey(msg.getLogPositionNumber()))
+			{	
+				System.out.println("Already having paxInstance for the same log Position");
 				PaxosInstance paxInstance = uidPaxosInstanceMap.get(uid);
 				if((msg.getBallotNumber().compareTo(paxInstance.getBallotNumber())) >=0 ){
 					paxInstance.setBallotNumber(msg.getBallotNumber());
@@ -1035,8 +972,8 @@ public class PaxosAcceptor extends Node implements Runnable{
 								System.out.println("Reached majority of acceptors, but DECIDE not yet sent. DECIDING and sending DECIDE msg");						
 								paxInstance.isDecideSent = true;
 								paxInstance.addToDecideList(nodeAddress);
-								if(pendingPaxosInstances.contains(uid))
-									pendingPaxosInstances.remove(uid);
+								if(pendingPaxosInstances.contains(msg.getLogPositionNumber()))
+									pendingPaxosInstances.remove(msg.getLogPositionNumber());
 
 								System.out.println("AcceptValue decided to be :: \n");
 
@@ -1051,7 +988,8 @@ public class PaxosAcceptor extends Node implements Runnable{
 								}
 								paxInstance.setCommited();
 								uidPaxosInstanceMap.put(uid, paxInstance);
-
+								System.out.println("====================== Adding pax instance to log position "+msg.getLogPositionNumber()+" "+paxInstance);
+								logPositionToPaxInstanceMap.put(msg.getLogPositionNumber(), paxInstance);
 								initiateDecide(msg);
 
 							}
@@ -1068,14 +1006,12 @@ public class PaxosAcceptor extends Node implements Runnable{
 			else{
 				System.out.println("First time seeing ACCEPT msg. Accepting the value and sending ACCEPT to all");
 
-
+				
 				PaxosInstance paxInstance = new PaxosInstance(uid, msg.getBallotNumber(), msg.getAcceptValue());
 				paxInstance.addtoAcceptList(msg.getSource());
 				paxInstance.addtoAcceptList(nodeAddress);
-				if(!pendingPaxosInstances.contains(uid)){
-					pendingPaxosInstances.add(msg.getUID());
-					paxInstance.setTimeStamp(new Date().getTime());
-				}
+				paxInstance.setTimeStamp(new Date().getTime());
+				
 				boolean isWriteLock = true;
 				for(ElementProto element : paxInstance.getAcceptedValue().getElementsList())
 				{
@@ -1089,10 +1025,16 @@ public class PaxosAcceptor extends Node implements Runnable{
 				if(isWriteLock){
 					paxInstance.setAcceptSent();
 					uidPaxosInstanceMap.put(uid, paxInstance );
+					
 					int newLogPosition = logCounter++;
-					System.out.println("!!!!!!!!!! First time ACCEPT");
-					uidTologLocationMap.put(uid, new LogPositionDetail(newLogPosition));
+					System.out.println("!!!!!!!!!! First time ACCEPT "+newLogPosition+" "+paxInstance);
+					uidTologPositionMap.put(uid, newLogPosition);
 					logPostionToUIDMap.put(newLogPosition, uid);
+					logPositionToPaxInstanceMap.put(newLogPosition, paxInstance);
+					if(!pendingPaxosInstances.contains(newLogPosition)){
+						pendingPaxosInstances.add(newLogPosition);
+					}
+					
 					PaxosMsg message = new PaxosMsg(nodeAddress, uid,PaxosMsgType.ACCEPT, msg.getBallotNumber(),msg.getAcceptValue());
 					message.setLogPositionNumber(msg.getLogPositionNumber());
 					sendAcceptMsg( message );
@@ -1100,12 +1042,14 @@ public class PaxosAcceptor extends Node implements Runnable{
 				else{
 					uidPaxosInstanceMap.put(uid, paxInstance );
 					uidTransMap.remove(uid);
-					pendingPaxosInstances.remove(uid);
+					
 					dummyInstance = new PaxosInstance("A"+uid.substring(1), null);
+					dummyInstance.setAcceptedValue(msg.getAcceptValue());
 					uidPaxosInstanceMap.put("A"+uid.substring(1), dummyInstance);
 					System.out.println("!!!!!!!!!! First time accept, cannot acquire locks");
 					int newLogPosition = logCounter++;
 					writeToPaxLogFile(newLogPosition, "ABORTED", paxInstance.getAcceptedValue());
+					logPositionToPaxInstanceMap.put(newLogPosition, dummyInstance);
 					TransactionSource tempTransSource = uidTransMap.get(msg.getUID());
 					System.out.println("Sending client response(ABORT) to "+tempTransSource.getSource());
 					lockTable.releaseLocksOfAborted(tempTransSource.trans);
@@ -1116,7 +1060,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 
 				}
 			}
-		}
+		
 
 	}
 
@@ -1129,7 +1073,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 			Boolean isWritten = localResource.WriteResource(paxInstance.getAcceptedValue());
 
 			if(isWritten){
-				writeToPaxLogFile(uidTologLocationMap.get(uid).logPosition, "COMMITED", paxInstance.getAcceptedValue());
+				writeToPaxLogFile(uidTologPositionMap.get(uid), "COMMITED", paxInstance.getAcceptedValue());
 				System.out.println("Releasing the resources");
 				releaseLocks(paxInstance.getAcceptedValue(), uid.substring(1));
 				System.out.println("Trans id "+uid.substring(1));
@@ -1158,7 +1102,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 			else{
 				//send client response
 				///FIX me . send to TPC
-				writeToPaxLogFile(uidTologLocationMap.get(uid).logPosition, "ABORTED", paxInstance.getAcceptedValue());
+				writeToPaxLogFile(uidTologPositionMap.get(uid), "ABORTED", paxInstance.getAcceptedValue());
 				if(isLeader){
 					TransactionSource tempTransSource = uidTransMap.get(msg.getUID());
 					System.out.println("Sending client response(ABORT) to "+tempTransSource.getSource());
@@ -1174,7 +1118,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		else if(uid.startsWith("P")){//Pax instance for PREPARE phase. Just obtained read locks
 			System.out.println("Sending DECIDE to ALL ACCEPTORS after REACHING MAJORITY - P");
 			//FIX ME: send DECIDE msg to participants
-			writeToPaxLogFile(uidTologLocationMap.get(uid).logPosition, "PREPARED", paxInstance.getAcceptedValue());
+			writeToPaxLogFile(uidTologPositionMap.get(uid), "PREPARED", paxInstance.getAcceptedValue());
 			PaxosMsg message = new PaxosMsg(nodeAddress, uid, PaxosMsgType.DECIDE, msg.getBallotNumber(), msg.getAcceptValue());
 			message.setLogPositionNumber(msg.getLogPositionNumber());
 			sendDecideMsg(message);
@@ -1197,7 +1141,6 @@ public class PaxosAcceptor extends Node implements Runnable{
 				System.out.println("Done with ABORT, sent response to TPC ");
 				sendPaxosInstanceResponse(msg);
 			}
-
 		}
 	}
 

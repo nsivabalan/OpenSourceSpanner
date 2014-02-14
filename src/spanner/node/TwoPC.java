@@ -139,7 +139,7 @@ public class TwoPC implements Runnable{
 
 		Long curTime = new Date().getTime();
 		Set<String> pendingTransTemp = pendingTrans;
-		System.out.println("--------------------------- TwoPC start ----------------------------- ");
+		//System.out.println("--------------------------- TwoPC start ----------------------------- ");
 		for(String uid: pendingTransTemp)
 		{
 			if(uidTransTypeMap.get(uid) != TransactionType.ABORT)
@@ -171,7 +171,7 @@ public class TwoPC implements Runnable{
 				}
 			}
 		}
-		System.out.println("--------------------------- TwoPC end ----------------------------- ");
+		//System.out.println("--------------------------- TwoPC end ----------------------------- ");
 	}
 
 	public void ProcessInfoMessage(TwoPCMsg message)
