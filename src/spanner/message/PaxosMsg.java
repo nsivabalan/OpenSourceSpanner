@@ -25,7 +25,7 @@ public class PaxosMsg extends MessageBase{
 	private BallotNumber ballotNo;
 	private BallotNumber acceptNo;
 	private ElementsSetProto acceptValue;
-	private int logPositionNumber;
+	private int logPositionNumber = -2;
 	//Prepare message
 /*	public PaxosMsg(NodeProto source, PaxosMsgType type)
 	{
@@ -123,6 +123,8 @@ public class PaxosMsg extends MessageBase{
 		bf.append("\nUID - "+this.uidstr);
 		bf.append("\n Source - " + this.source.getHost()+":"+this.source.getPort());
 		bf.append("\n MsgType - " + this.type);
+		if(logPositionNumber != -2)
+			bf.append("\n Log Position - "+logPositionNumber);
 		if(ballotNo != null)
 			bf.append("\n Ballot Number - "+ballotNo);
 		if(acceptNo != null)

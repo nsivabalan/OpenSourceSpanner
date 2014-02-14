@@ -36,6 +36,7 @@ public class Common {
 	
 	public enum State {ACTIVE, PAUSED};
 	public enum ReplayMsgType {REQEUST, RESPONSE};
+	public enum LeaderMsgType {REQUEST, RESPONSE};
 	public enum TransactionType{ STARTED, READINIT, READDONE, WRITEINIT, COMMIT, ABORT, PREPARE_DONE};
 	public enum RequestType {PREPARE, COMMIT, ABORT};
 	public enum ClientOPMsgType{READ,WRITE,READ_RESPONSE,UNLOCK, COMMIT, RELEASE_RESOURCE, WRITE_RESPONSE,ABORT};

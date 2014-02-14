@@ -3,14 +3,17 @@ package spanner.metadataservice;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.logging.Level;
 
 import org.zeromq.ZMQ;
 
 import spanner.common.Common;
 import spanner.common.MessageWrapper;
+import spanner.common.Common.LeaderMsgType;
 import spanner.common.Common.MetaDataMsgType;
 import spanner.common.Common.PaxosDetailsMsgType;
 import spanner.common.Common.PaxosMsgType;
+import spanner.message.LeaderMsg;
 import spanner.message.MetaDataMsg;
 import spanner.message.PaxosDetailsMsg;
 import spanner.node.Node;
@@ -75,6 +78,17 @@ public class MDService extends Node implements Runnable{
 					else if(message.getMsgType() == PaxosDetailsMsgType.LEADER)
 						ProcessRequestLeader(message);
 				}
+				else if(msgwrap.getmessageclass() == LeaderMsg.class )
+				{
+					LeaderMsg message = (LeaderMsg)msgwrap.getDeSerializedInnerMessage();
+					if(message.getType() == LeaderMsgType.RESPONSE)
+					{
+						updateLeaderInfo(message);
+					}
+					else{
+						this.AddLogEntry("Leader Request unexpected ", Level.INFO);
+					}
+				}
 				}
 				 catch (ClassNotFoundException e) {
 					e.printStackTrace();
@@ -84,6 +98,15 @@ public class MDService extends Node implements Runnable{
 		
 		socket.close();
 		context.term();
+	}
+	
+	private void updateLeaderInfo(LeaderMsg msg)
+	{
+		this.AddLogEntry("Leader Info received for "+msg.getShard()+", chosen leader "+msg.getSource().getHost()+":"+msg.getSource().getPort(), Level.INFO);
+		if(msg.isLeader())
+		{
+			metadataService.setLeaderAddress(msg.getShard(), msg.getSource());
+		}
 	}
 	
 	private void ProcessRequestAcceptors(PaxosDetailsMsg msg)
@@ -96,6 +119,7 @@ public class MDService extends Node implements Runnable{
 	
 	private void ProcessRequestLeader(PaxosDetailsMsg msg)
 	{
+		this.AddLogEntry(msg.getSource().getHost()+":"+msg.getSource().getPort()+" requesting Leader Address", Level.INFO);
 		NodeProto shardLeader = metadataService.getShardLeader(msg.getShardId());
 		PaxosDetailsMsg message = new PaxosDetailsMsg(mdsNode, msg.getShardId(), PaxosDetailsMsgType.LEADER);
 		message.setShardLeader(shardLeader);

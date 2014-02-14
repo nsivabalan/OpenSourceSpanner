@@ -36,7 +36,8 @@ public class Node {
 	
 
 	//Add a new log entry.
-	public void AddLogEntry(String message, Level level){		
+	public void AddLogEntry(String message, Level level){	
+		System.out.println(message);
 		LOGGER.logp(level, this.getClass().toString(), "", message);		
 	}
 

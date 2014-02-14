@@ -30,6 +30,7 @@ import spanner.common.Common;
 import spanner.common.MessageWrapper;
 import spanner.common.ResourceHM;
 import spanner.common.Common.ClientOPMsgType;
+import spanner.common.Common.LeaderMsgType;
 import spanner.common.Common.PLeaderState;
 import spanner.common.Common.PaxosDetailsMsgType;
 import spanner.common.Common.PaxosMsgType;
@@ -38,6 +39,7 @@ import spanner.common.Common.TwoPCMsgType;
 import spanner.locks.LockTable;
 import spanner.locks.LockTableOld;
 import spanner.message.ClientOpMsg;
+import spanner.message.LeaderMsg;
 import spanner.message.PaxosDetailsMsg;
 import spanner.message.PaxosMsg;
 import spanner.message.ReplayMsg;
@@ -75,6 +77,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private ConcurrentHashMap<Integer, PaxosInstance> logPositionToPaxInstanceMap = null;
 	private HashSet<Integer> pendingPaxosInstances = null;
 	private HashMap<String, TransactionSource> uidTransMap = null;
+	private ClientOpMsg waitingRequest = null;
 	private PaxosInstance dummyInstance = null;
 	TwoPC twoPhaseCoordinator = null;
 	private int logCounter = 0;
@@ -118,8 +121,8 @@ public class PaxosAcceptor extends Node implements Runnable{
 		uidTransMap = new HashMap<String, TransactionSource>();
 		localResource = new ResourceHM(this.LOGGER);
 		//to fix: remove after testing
-		if(nodeId.equalsIgnoreCase("1") || nodeId.equalsIgnoreCase("4"))
-			isLeader = true;
+		//if(nodeId.equalsIgnoreCase("1") || nodeId.equalsIgnoreCase("4"))
+			//isLeader = true;
 		dummyInstance = new PaxosInstance(null,  null);
 		state = PLeaderState.INIT;
 		//state = PLeaderState.ACTIVE;
@@ -130,26 +133,9 @@ public class PaxosAcceptor extends Node implements Runnable{
 		uidTologPositionMap = new HashMap<String, Integer>();
 		logPostionToUIDMap = new HashMap<Integer, String>();
 		sendPaxosMsgRequestingAcceptors();
+		
 		sendPaxosMsgRequestingLeader(clear);
 	}
-
-	private class LogPositionDetail{
-		int logPosition;
-		boolean isWritten;
-
-		public LogPositionDetail(int logPosition)
-		{
-			this.logPosition = logPosition;
-		}
-		public boolean isWritten() {
-			return isWritten;
-		}
-		public void setWritten(boolean isWritten) {
-			this.isWritten = isWritten;
-		}
-
-	}
-
 
 	private class TransactionSource{
 		TransactionProto trans;
@@ -225,8 +211,10 @@ public class PaxosAcceptor extends Node implements Runnable{
 		int lastLogPos = getLastPaxosInstanceNumber();
 		boolean validFlag = true;
 		int size = logEntries.size();
-		if(size == 0)
+		if(size == 0){
 			this.state = PLeaderState.ACTIVE;
+			this.AddLogEntry("No entries found. Changed to ACTIVE state", Level.INFO);
+		}
 		else
 		{
 			for(int i=0;i<size;i++)
@@ -252,9 +240,28 @@ public class PaxosAcceptor extends Node implements Runnable{
 				ReplayLogEntry lastEntry = logEntries.get(size-1);
 				logCounter = lastEntry.getLogPosition() +1;
 				this.state = PLeaderState.ACTIVE;
+				if(waitingRequest != null)
+				{
+					this.AddLogEntry("Replayed log. Forwarding request to Leader", Level.INFO);
+					forwardClientRequestToLeader(waitingRequest);
+				}
+			}
+			else{
+				this.AddLogEntry("Replayed all log entries. Listening for messages ", Level.INFO);
 			}
 		}
 	}
+
+	private void forwardClientRequestToLeader(ClientOpMsg waitingRequest)
+	{
+		this.AddLogEntry("Sent "+waitingRequest, Level.INFO);
+		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
+		pushSocket.connect("tcp://"+leaderAddress.getHost()+":"+leaderAddress.getPort());
+		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(waitingRequest), waitingRequest.getClass());
+		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
+		pushSocket.close();
+	}
+
 
 	private void replayLog(ReplayLogEntry logEntry)
 	{	
@@ -357,17 +364,33 @@ public class PaxosAcceptor extends Node implements Runnable{
 
 	private void sendPaxosMsgRequestingLeader( String isNew)
 	{
-		if(isNew.equalsIgnoreCase("T"))
-		{
-			state = PLeaderState.ACTIVE;
-		}
-		else{
+		
+		if(leaderAddress == null){
+			this.AddLogEntry("Sending msg to MDS reqeusting leader", Level.INFO);
 			PaxosDetailsMsg msg = new PaxosDetailsMsg(nodeAddress, shard, PaxosDetailsMsgType.LEADER);
 			sendMsgToMDS(metadataService ,msg);
 		}
+		else{
+			this.AddLogEntry("I know the leader address. No need for replay log", Level.INFO);
+			state = PLeaderState.ACTIVE;
+		}
+		//}
 	}
 
 	private void sendMsgToMDS(NodeProto dest, PaxosDetailsMsg message)
+	{
+		//Print msg
+		System.out.println("Sent " + message);
+		this.AddLogEntry("Sent "+message, Level.INFO);
+
+		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
+		pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
+		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
+		pushSocket.close();
+	}
+	
+	private void sendMsgToMDS(NodeProto dest, LeaderMsg message)
 	{
 		//Print msg
 		System.out.println("Sent " + message);
@@ -391,17 +414,6 @@ public class PaxosAcceptor extends Node implements Runnable{
 		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
 		pushSocket.close();
 	}
-
-	/*public void readStreamMessages() throws NumberFormatException, IOException
-	{
-		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-		System.out.println("Enter Paxos Instance ID ");
-		String uid = br.readLine();
-		System.out.println("Enter value to initiate Paxos");
-		int value = Integer.parseInt(br.readLine());
-		sendPrepareMessage(uid, value);
-	}*/
-
 
 	public void executeDaemon()
 	{
@@ -528,26 +540,25 @@ public class PaxosAcceptor extends Node implements Runnable{
 
 					}
 
-					if(msgwrap.getmessageclass() == PaxosMsg.class && state == PLeaderState.ACTIVE)
+					if(msgwrap.getmessageclass() == PaxosMsg.class )
 					{
 
 						PaxosMsg msg = (PaxosMsg)msgwrap.getDeSerializedInnerMessage();
 						if(isLeader) System.out.println("Paxos msg received ++++++++++ "+msg);
 						if(msg.getType() == PaxosMsgType.PREPARE)
 						{
-							//handlePaxosPrepareMessage(msg);
+							handlePrepareMessage(msg);
 						}
 						else if(msg.getType() == PaxosMsgType.ACK)
 						{
-							//	handlePaxosAckMessage(msg);
-							System.out.println("ACK msg received. Not expected %%%%%%%%%%%%%%%%%%%%%% "+msg);
+							handleAckMessage(msg);
+							
 						}
-						else if(msg.getType() == PaxosMsgType.ACCEPT)
+						else if(msg.getType() == PaxosMsgType.ACCEPT && state == PLeaderState.ACTIVE)
 						{
-
 							handlePaxosAcceptMessage(msg);
 						}
-						else if(msg.getType() == PaxosMsgType.DECIDE)
+						else if(msg.getType() == PaxosMsgType.DECIDE && state == PLeaderState.ACTIVE)
 						{
 							System.out.println("DECIDE MSG from "+msg.getSource().getHost()+":"+msg.getSource().getPort());
 							handlePaxosDecideMessage(msg);
@@ -626,47 +637,51 @@ public class PaxosAcceptor extends Node implements Runnable{
 	}
 
 
-	private void handleClientReadMessage(ClientOpMsg message) throws IOException
+	private synchronized void handleClientReadMessage(ClientOpMsg message) throws IOException
 	{
+		if(isLeader){
+			System.out.println("Handling process client read msg");
+			NodeProto transClient = message.getSource();
+			TransactionProto trans = message.getTransaction();
+			System.out.println("Read set ::::::: "+trans.getReadSet());
 
-		System.out.println("Handling process client read msg");
-		NodeProto transClient = message.getSource();
-		TransactionProto trans = message.getTransaction();
-		System.out.println("Read set ::::::: "+trans.getReadSet());
+			boolean isReadLock = true;
+			for(ElementProto element : trans.getReadSet().getElementsList())
+			{
+				if(!lockTable.getReadLock(element.getRow(), trans.getTransactionID()))
+					isReadLock = false;
+			}
 
-		boolean isReadLock = true;
-		for(ElementProto element : trans.getReadSet().getElementsList())
-		{
-			if(!lockTable.getReadLock(element.getRow(), trans.getTransactionID()))
-				isReadLock = false;
+			System.out.println("Acquired all read locks."+isReadLock);
+			ClientOpMsg read_response = null;
+			if(isReadLock){
+				ElementsSetProto readValues = localResource.ReadResource(trans.getReadSet());
+
+				TransactionProto transaction = TransactionProto.newBuilder()
+						.setTransactionID(trans.getTransactionID())
+						.setTransactionStatus(TransactionStatusProto.ACTIVE)
+						.setReadSet(readValues)
+						.build();
+
+				System.out.println("Preparing Client Read Response");
+
+				read_response = new ClientOpMsg(nodeAddress, transaction, ClientOPMsgType.READ_RESPONSE, true);
+			}
+			else
+				read_response = new ClientOpMsg(nodeAddress, trans, ClientOPMsgType.READ_RESPONSE, false);
+
+			SendClientMessage(read_response, transClient);
+			System.out.println("Sent Read Data for UID - "+trans.getTransactionID());		
+			LOGGER.log(Level.FINE, new String("Sent Read Data for UID - "+trans.getTransactionID()));
 		}
-
-		System.out.println("Acquired all read locks."+isReadLock);
-		ClientOpMsg read_response = null;
-		if(isReadLock){
-			ElementsSetProto readValues = localResource.ReadResource(trans.getReadSet());
-
-			TransactionProto transaction = TransactionProto.newBuilder()
-					.setTransactionID(trans.getTransactionID())
-					.setTransactionStatus(TransactionStatusProto.ACTIVE)
-					.setReadSet(readValues)
-					.build();
-
-			System.out.println("Preparing Client Read Response");
-
-			read_response = new ClientOpMsg(nodeAddress, transaction, ClientOPMsgType.READ_RESPONSE, true);
+		else{
+			waitingRequest = message;
+			sendPaxosMsgRequestingLeader("F");
 		}
-		else
-			read_response = new ClientOpMsg(nodeAddress, trans, ClientOPMsgType.READ_RESPONSE, false);
-
-		SendClientMessage(read_response, transClient);
-		System.out.println("Sent Read Data for UID - "+trans.getTransactionID());		
-		LOGGER.log(Level.FINE, new String("Sent Read Data for UID - "+trans.getTransactionID()));
-
 	}
 
 
-	private void handleClientReleaseResourceMsg(ClientOpMsg message)
+	private synchronized void handleClientReleaseResourceMsg(ClientOpMsg message)
 	{
 		System.out.println("Inside process client release resource msg");
 		TransactionProto trans = message.getTransaction();
@@ -682,6 +697,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private void handleClientWriteMessage(ClientOpMsg msg)
 	{
 		//System.out.println("IsLeader --------- "+isLeader);
+		this.AddLogEntry("Handling client write msg ", Level.INFO);
 		if(isLeader)
 		{
 			TransactionProto trans = msg.getTransaction();
@@ -704,13 +720,10 @@ public class PaxosAcceptor extends Node implements Runnable{
 				uidTologPositionMap.put("P"+trans.getTransactionID(), newLogPosition);
 				logPostionToUIDMap.put(newLogPosition, "P"+trans.getTransactionID());
 				PaxosInstance paxInstance = new PaxosInstance("P"+trans.getTransactionID(), ballotNo, trans.getWriteSet());
-				//paxInstanceToUIDMap.put("P"+trans.getTransactionID(), trans.getTransactionID());
-				//uidPaxosInstanceMap.put("P"+trans.getTransactionID(), paxInstance);
-				//logPositionToPaxInstanceMap.put(newLogPosition, paxInstance);
 				uidTransMap.put( "P"+trans.getTransactionID(), new TransactionSource(trans,msg.getSource(), TwoPCMsgType.PREPARE));
 				paxInstance.setAcceptSent();
 				paxInstance.setTimeStamp(new Date().getTime());
-				
+
 				paxInstance.addtoAcceptList(nodeAddress);
 				pendingPaxosInstances.add(newLogPosition);
 				uidPaxosInstanceMap.put("P"+trans.getTransactionID(), paxInstance);
@@ -723,33 +736,122 @@ public class PaxosAcceptor extends Node implements Runnable{
 			else{
 				System.out.println("Not able to acquire locks. Aborting the trans");
 				lockTable.releaseLocksOfAborted(trans);
-				//ClientOpMsg message = new ClientOpMsg(nodeAddress, trans, ClientOPMsgType.ABORT);
-				//SendClientMessage(message, msg.getSource());
 				//Fix me
 				TwoPCMsg message = new TwoPCMsg(nodeAddress, trans, TwoPCMsgType.ABORT);
 				SendTwoPCMessage(message, msg.getSource());
 			}
 		}
 		else{
-			//yet to fill in
+			this.AddLogEntry("I am not the leader. Request Leader info from MDS", Level.INFO);
+			waitingRequest = msg;
+			sendPaxosMsgRequestingLeader("F");
 		}
 	}
 
-	
+
 	private void initiatePreparePhase()
 	{
 		int newLogPosition = logCounter;
 		PaxosInstance paxInstance = new PaxosInstance("-1", ballotNo);
-		
+		logPositionToPaxInstanceMap.put(newLogPosition, paxInstance);
+		PaxosMsg msg = new PaxosMsg(nodeAddress, "-1", PaxosMsgType.PREPARE, ballotNo);
+		msg.setLogPositionNumber(newLogPosition);
+		SendPrepareMessage(msg);
 	}
 
-	
-	
+	private synchronized void initiatePreparePhase(String uid, ElementsSetProto acceptedValue)
+	{
+		int newLogPosition = logCounter;
+		PaxosInstance paxInstance = new PaxosInstance(uid, ballotNo, acceptedValue);
+		logPositionToPaxInstanceMap.put(newLogPosition, paxInstance);
+		PaxosMsg msg = new PaxosMsg(nodeAddress, uid, PaxosMsgType.PREPARE, ballotNo);
+		msg.setLogPositionNumber(newLogPosition);
+		SendPrepareMessage(msg);
+	}
+
+
+	private synchronized void handlePrepareMessage(PaxosMsg msg)
+	{
+		if(logPositionToPaxInstanceMap.contains(msg.getLogPositionNumber()))
+		{
+			this.AddLogEntry("Already seen another paxos instance for the same log position ", Level.INFO);
+			PaxosInstance paxInstance = logPositionToPaxInstanceMap.get(msg.getLogPositionNumber());
+			if( (msg.getBallotNumber().compareTo(paxInstance.getBallotNumber()) >= 0))
+			{
+				this.AddLogEntry("Sending ACK to "+ msg.getSource().getHost()+":"+msg.getSource().getPort()+" with my prev stored values (received Bal >= my prev BN)", Level.INFO);
+				PaxosMsg message = new PaxosMsg(nodeAddress, msg.getUID() , PaxosMsgType.ACK, msg.getBallotNumber(), paxInstance.getBallotNumber(), paxInstance.getAcceptedValue());
+				message.setLogPositionNumber(msg.getLogPositionNumber());
+				sendPaxosMsg(msg.getSource(), message);
+			}
+			else{
+				this.AddLogEntry("Ignoring  received PREPARE msg from "+ msg.getSource().getHost()+":"+msg.getSource().getPort()+" as my prev stored BN ("+paxInstance.getBallotNumber()+" > received Bal "+msg.getBallotNumber(), Level.INFO);
+			}
+		}
+		else{
+			this.AddLogEntry("Received PREPARE msg for this log position "+msg.getLogPositionNumber()+" for the first time", Level.INFO);
+			this.AddLogEntry("Sending ACK to "+ msg.getSource().getHost()+":"+msg.getSource().getPort()+" with null values ", Level.INFO);
+			PaxosInstance paxInstance = new PaxosInstance(msg.getUID(), msg.getBallotNumber());
+			logPositionToPaxInstanceMap.put(msg.getLogPositionNumber(), paxInstance);
+			PaxosMsg message = new PaxosMsg(nodeAddress, msg.getUID() , PaxosMsgType.ACK, msg.getBallotNumber(), null, null);
+			message.setLogPositionNumber(msg.getLogPositionNumber());
+			sendPaxosMsg(msg.getSource(), message);
+		}
+	}
+
+	private synchronized void handleAckMessage(PaxosMsg msg)
+	{
+		int logPos = msg.getLogPositionNumber();
+		System.out.println("Received ACK for position "+logPos +" ::: "+logPositionToPaxInstanceMap.keySet()+" "+logPositionToPaxInstanceMap.get(logPos) );
+		if(logPositionToPaxInstanceMap.get(logPos) != null)
+		{
+			System.out.println("Inside IF LOOP");
+			PaxosInstance paxInstance = logPositionToPaxInstanceMap.get(logPos);
+			if(msg.getAcceptNo() != null)
+			{
+				if(paxInstance.getAcceptedNumber() == null || msg.getAcceptNo().compareTo(paxInstance.getAcceptedNumber()) > 0)
+				{
+					this.AddLogEntry("Updating Paxos instance values( AN and AV) with received value", Level.INFO);
+					paxInstance.setAcceptNumber(msg.getAcceptNo());
+					paxInstance.setAcceptedValue(msg.getAcceptValue());
+				}
+				else{
+					this.AddLogEntry("Ignoring the accepted value as ballotNo is smaller",Level.INFO );
+				}
+			}
+			paxInstance.acks.add(msg.getSource());
+			if(paxInstance.acks.size() > acceptorsCount/2 && !paxInstance.isAcceptSent)
+			{
+				this.isLeader = true;
+				leaderAddress = nodeAddress;
+				paxInstance.isAcceptSent= true;
+				announceMDSAboutLeaderShip();
+				logPositionToPaxInstanceMap.put(logPos, paxInstance);
+				if(paxInstance.getAcceptedValue() != null){
+					this.AddLogEntry("Reached majority of ACKS. Sending ACCEPT msgs to all acceptors. (Became the LEADER in the process)", Level.INFO);
+					
+					PaxosMsg message = new PaxosMsg( nodeAddress , paxInstance.getUID(), PaxosMsgType.ACCEPT, paxInstance.getBallotNumber(), paxInstance.getAcceptedValue());
+					message.setLogPositionNumber(logPos);
+					SendMessageToAcceptors(message);
+				}
+				else{
+					this.AddLogEntry("Reached majority of ACKS. No Accepted Value found. Elected as a leader", Level.INFO);
+					
+				}
+			}
+			else
+				logPositionToPaxInstanceMap.put(logPos, paxInstance);
+		}
+		else{
+			System.out.println("Couldn't find pax Instance for log position "+logPos+"... entries "+logPositionToPaxInstanceMap.keySet());
+			this.AddLogEntry("Received ACK msg for a log position for which no PREPARE was sent. Hence silently ignoring the msg", Level.INFO);
+		}
+	}
+
 	private void SendPrepareMessage(PaxosMsg message)
 	{
 		SendMessageToAcceptors(message);
 	}
-	
+
 	private void SendMessageToAcceptors(PaxosMsg msg)
 	{
 		for(NodeProto node: acceptors)
@@ -757,6 +859,13 @@ public class PaxosAcceptor extends Node implements Runnable{
 			if(!nodeAddress.equals(node))
 				sendPaxosMsg(node, msg);
 		}
+	}
+
+	private void announceMDSAboutLeaderShip()
+	{
+		LeaderMsg msg = new LeaderMsg(nodeAddress, LeaderMsgType.RESPONSE, shard);
+		msg.setLeader();
+		sendMsgToMDS(metadataService, msg);
 	}
 	
 	private void handleTwoPCCommitMessage(TwoPCMsg msg)
@@ -824,8 +933,8 @@ public class PaxosAcceptor extends Node implements Runnable{
 			TransactionProto trans = msg.getTransaction();
 			String uid = trans.getTransactionID();
 			if(!uidPaxosInstanceMap.contains("A"+uid)){
-				
-				
+
+
 				if(pendingPaxosInstances.contains(uidTologPositionMap.get("P"+uid)))
 				{
 					System.out.println("Aborting paxInstance for PREPARE for the same trans ");
@@ -846,7 +955,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 				paxInstance.setTimeStamp(new Date().getTime());
 				pendingPaxosInstances.add(newLogPosition);
 				paxInstance.addtoAcceptList(nodeAddress);
-				
+
 				System.out.println("Adding paxIsntace for Abort ******** "+paxInstance);
 				uidPaxosInstanceMap.put("A"+trans.getTransactionID(), paxInstance);
 				logPositionToPaxInstanceMap.put(newLogPosition, paxInstance);
@@ -869,14 +978,14 @@ public class PaxosAcceptor extends Node implements Runnable{
 	{
 		String uid = msg.getUID();
 		System.out.println("$$$$$$$$$$$$$$$ Handling DECIDE msg for "+uid+"  from :: "+msg.getSource().getHost()+":"+msg.getSource().getPort()+" $$$$$$$$$$$$ ");
-		
+
 		/*System.out.println("List of entires in logPositiontoPI map");
 		for(Integer pos: logPositionToPaxInstanceMap.keySet())
 		{
 			System.out.println(" "+pos+" "+logPositionToPaxInstanceMap.get(pos));
 		}
 		System.out.println("Done ");*/ 
-		
+
 		System.out.println(" logPosition "+msg.getLogPositionNumber());
 		if(logPositionToPaxInstanceMap.containsKey(msg.getLogPositionNumber()))
 		{
@@ -954,113 +1063,113 @@ public class PaxosAcceptor extends Node implements Runnable{
 	{
 		String uid = msg.getUID();
 		System.out.println("Handling ACCEPT msg for "+uid+" from :: "+msg.getSource().getHost()+":"+msg.getSource().getPort());
-		
-			if(logPostionToUIDMap.containsKey(msg.getLogPositionNumber()))
-			{	
-				System.out.println("Already having paxInstance for the same log Position");
-				PaxosInstance paxInstance = uidPaxosInstanceMap.get(uid);
-				if((msg.getBallotNumber().compareTo(paxInstance.getBallotNumber())) >=0 ){
-					paxInstance.setBallotNumber(msg.getBallotNumber());
-					int prevCount = paxInstance.accepts.size();
-					paxInstance.accepts.add(msg.getSource());
-					int newCount = paxInstance.accepts.size();
-					if(newCount > prevCount){
-						if(newCount >  acceptorsCount/2)
+
+		if(logPostionToUIDMap.containsKey(msg.getLogPositionNumber()))
+		{	
+			System.out.println("Already having paxInstance for the same log Position");
+			PaxosInstance paxInstance = uidPaxosInstanceMap.get(uid);
+			if((msg.getBallotNumber().compareTo(paxInstance.getBallotNumber())) >=0 ){
+				paxInstance.setBallotNumber(msg.getBallotNumber());
+				int prevCount = paxInstance.accepts.size();
+				paxInstance.accepts.add(msg.getSource());
+				int newCount = paxInstance.accepts.size();
+				if(newCount > prevCount){
+					if(newCount >  acceptorsCount/2)
+					{
+						if(!paxInstance.isDecideSent)
 						{
-							if(!paxInstance.isDecideSent)
+							System.out.println("Reached majority of acceptors, but DECIDE not yet sent. DECIDING and sending DECIDE msg");						
+							paxInstance.isDecideSent = true;
+							paxInstance.addToDecideList(nodeAddress);
+							if(pendingPaxosInstances.contains(msg.getLogPositionNumber()))
+								pendingPaxosInstances.remove(msg.getLogPositionNumber());
+
+							System.out.println("AcceptValue decided to be :: \n");
+
+							for(ElementProto elementProto:  paxInstance.getAcceptedValue().getElementsList())
 							{
-								System.out.println("Reached majority of acceptors, but DECIDE not yet sent. DECIDING and sending DECIDE msg");						
-								paxInstance.isDecideSent = true;
-								paxInstance.addToDecideList(nodeAddress);
-								if(pendingPaxosInstances.contains(msg.getLogPositionNumber()))
-									pendingPaxosInstances.remove(msg.getLogPositionNumber());
-
-								System.out.println("AcceptValue decided to be :: \n");
-
-								for(ElementProto elementProto:  paxInstance.getAcceptedValue().getElementsList())
+								String temp = elementProto.getRow()+":";
+								for(ColElementProto colElemProto: elementProto.getColsList())
 								{
-									String temp = elementProto.getRow()+":";
-									for(ColElementProto colElemProto: elementProto.getColsList())
-									{
-										temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
-									}
-									System.out.println(temp+"\n");
+									temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
 								}
-								paxInstance.setCommited();
-								uidPaxosInstanceMap.put(uid, paxInstance);
-								System.out.println("====================== Adding pax instance to log position "+msg.getLogPositionNumber()+" "+paxInstance);
-								logPositionToPaxInstanceMap.put(msg.getLogPositionNumber(), paxInstance);
-								initiateDecide(msg);
+								System.out.println(temp+"\n");
+							}
+							paxInstance.setCommited();
+							uidPaxosInstanceMap.put(uid, paxInstance);
+							System.out.println("====================== Adding pax instance to log position "+msg.getLogPositionNumber()+" "+paxInstance);
+							logPositionToPaxInstanceMap.put(msg.getLogPositionNumber(), paxInstance);
+							initiateDecide(msg);
 
-							}
-							else{
-								System.out.println("Reached majority and already DECIDED. No action taken");
-							}
+						}
+						else{
+							System.out.println("Reached majority and already DECIDED. No action taken");
 						}
 					}
 				}
-				else{
-					System.out.println("Already accepted BN is greater than the received one. My cur BN: "+paxInstance.getBallotNumber()+", received "+msg.getBallotNumber());
-				}
 			}
 			else{
-				System.out.println("First time seeing ACCEPT msg. Accepting the value and sending ACCEPT to all");
-
-				
-				PaxosInstance paxInstance = new PaxosInstance(uid, msg.getBallotNumber(), msg.getAcceptValue());
-				paxInstance.addtoAcceptList(msg.getSource());
-				paxInstance.addtoAcceptList(nodeAddress);
-				paxInstance.setTimeStamp(new Date().getTime());
-				
-				boolean isWriteLock = true;
-				for(ElementProto element : paxInstance.getAcceptedValue().getElementsList())
-				{
-					if(!lockTable.getWriteLock(element.getRow(), uid.substring(1)))
-					{
-						isWriteLock = false;
-					}
-
-				}
-
-				if(isWriteLock){
-					paxInstance.setAcceptSent();
-					uidPaxosInstanceMap.put(uid, paxInstance );
-					
-					int newLogPosition = logCounter++;
-					System.out.println("!!!!!!!!!! First time ACCEPT "+newLogPosition+" "+paxInstance);
-					uidTologPositionMap.put(uid, newLogPosition);
-					logPostionToUIDMap.put(newLogPosition, uid);
-					logPositionToPaxInstanceMap.put(newLogPosition, paxInstance);
-					if(!pendingPaxosInstances.contains(newLogPosition)){
-						pendingPaxosInstances.add(newLogPosition);
-					}
-					
-					PaxosMsg message = new PaxosMsg(nodeAddress, uid,PaxosMsgType.ACCEPT, msg.getBallotNumber(),msg.getAcceptValue());
-					message.setLogPositionNumber(msg.getLogPositionNumber());
-					sendAcceptMsg( message );
-				}
-				else{
-					uidPaxosInstanceMap.put(uid, paxInstance );
-					uidTransMap.remove(uid);
-					
-					dummyInstance = new PaxosInstance("A"+uid.substring(1), null);
-					dummyInstance.setAcceptedValue(msg.getAcceptValue());
-					uidPaxosInstanceMap.put("A"+uid.substring(1), dummyInstance);
-					System.out.println("!!!!!!!!!! First time accept, cannot acquire locks");
-					int newLogPosition = logCounter++;
-					writeToPaxLogFile(newLogPosition, "ABORTED", paxInstance.getAcceptedValue());
-					logPositionToPaxInstanceMap.put(newLogPosition, dummyInstance);
-					TransactionSource tempTransSource = uidTransMap.get(msg.getUID());
-					System.out.println("Sending client response(ABORT) to "+tempTransSource.getSource());
-					lockTable.releaseLocksOfAborted(tempTransSource.trans);
-					//ClientOpMsg message = new ClientOpMsg(nodeAddress, tempTransSource.getTrans(), ClientOPMsgType.ABORT);
-					//SendClientMessage(message, tempTransSource.getSource());
-					TwoPCMsg message = new TwoPCMsg(nodeAddress, tempTransSource.getTrans(), TwoPCMsgType.ABORT, true);
-					SendTwoPCMessage(message, msg.getSource());
-
-				}
+				System.out.println("Already accepted BN is greater than the received one. My cur BN: "+paxInstance.getBallotNumber()+", received "+msg.getBallotNumber());
 			}
-		
+		}
+		else{
+			System.out.println("First time seeing ACCEPT msg. Accepting the value and sending ACCEPT to all");
+
+
+			PaxosInstance paxInstance = new PaxosInstance(uid, msg.getBallotNumber(), msg.getAcceptValue());
+			paxInstance.addtoAcceptList(msg.getSource());
+			paxInstance.addtoAcceptList(nodeAddress);
+			paxInstance.setTimeStamp(new Date().getTime());
+
+			boolean isWriteLock = true;
+			for(ElementProto element : paxInstance.getAcceptedValue().getElementsList())
+			{
+				if(!lockTable.getWriteLock(element.getRow(), uid.substring(1)))
+				{
+					isWriteLock = false;
+				}
+
+			}
+
+			if(isWriteLock){
+				paxInstance.setAcceptSent();
+				uidPaxosInstanceMap.put(uid, paxInstance );
+
+				int newLogPosition = logCounter++;
+				System.out.println("!!!!!!!!!! First time ACCEPT "+newLogPosition+" "+paxInstance);
+				uidTologPositionMap.put(uid, newLogPosition);
+				logPostionToUIDMap.put(newLogPosition, uid);
+				logPositionToPaxInstanceMap.put(newLogPosition, paxInstance);
+				if(!pendingPaxosInstances.contains(newLogPosition)){
+					pendingPaxosInstances.add(newLogPosition);
+				}
+
+				PaxosMsg message = new PaxosMsg(nodeAddress, uid,PaxosMsgType.ACCEPT, msg.getBallotNumber(),msg.getAcceptValue());
+				message.setLogPositionNumber(msg.getLogPositionNumber());
+				sendAcceptMsg( message );
+			}
+			else{
+				uidPaxosInstanceMap.put(uid, paxInstance );
+				uidTransMap.remove(uid);
+
+				dummyInstance = new PaxosInstance("A"+uid.substring(1), null);
+				dummyInstance.setAcceptedValue(msg.getAcceptValue());
+				uidPaxosInstanceMap.put("A"+uid.substring(1), dummyInstance);
+				System.out.println("!!!!!!!!!! First time accept, cannot acquire locks");
+				int newLogPosition = logCounter++;
+				writeToPaxLogFile(newLogPosition, "ABORTED", paxInstance.getAcceptedValue());
+				logPositionToPaxInstanceMap.put(newLogPosition, dummyInstance);
+				TransactionSource tempTransSource = uidTransMap.get(msg.getUID());
+				System.out.println("Sending client response(ABORT) to "+tempTransSource.getSource());
+				lockTable.releaseLocksOfAborted(tempTransSource.trans);
+				//ClientOpMsg message = new ClientOpMsg(nodeAddress, tempTransSource.getTrans(), ClientOPMsgType.ABORT);
+				//SendClientMessage(message, tempTransSource.getSource());
+				TwoPCMsg message = new TwoPCMsg(nodeAddress, tempTransSource.getTrans(), TwoPCMsgType.ABORT, true);
+				SendTwoPCMessage(message, msg.getSource());
+
+			}
+		}
+
 
 	}
 
@@ -1208,18 +1317,46 @@ public class PaxosAcceptor extends Node implements Runnable{
 		}
 		acceptorsCount = acceptors.size();
 		System.out.println("List of Acceptors "+acceptors);
-		if(isLeader)
-			this.state = PLeaderState.ACTIVE;
+		//if(isLeader)
+			//this.state = PLeaderState.ACTIVE;
 		//	initPaxosInstance();
 	}
 
 	private void handlePaxosDetailsLeaderMsg(PaxosDetailsMsg msg)
 	{
+		this.AddLogEntry("Handling Leader info response from MDS", Level.INFO);
 		leaderAddress = msg.getShardLeader();
-		int logPosition = getLastPaxosInstanceNumber();
-		if(!isLeader){
-			System.out.println("Last log position "+logPosition);
-			requestReplayLog(logPosition, leaderAddress);
+		if(leaderAddress != null)
+		{
+			this.AddLogEntry("Leader availabe "+leaderAddress.getHost()+":"+leaderAddress.getPort(), Level.INFO);
+			int logPosition = getLastPaxosInstanceNumber();
+			logCounter = logPosition;
+			if(leaderAddress.equals(nodeAddress)){
+				isLeader= true;
+				this.state = PLeaderState.ACTIVE;
+				this.AddLogEntry("I am the leader as given by MDS" , Level.INFO);
+			}
+			else{
+				System.out.println("Last log position "+logPosition);
+				this.AddLogEntry("Requesting replay log to Leader "+leaderAddress, Level.INFO);
+				requestReplayLog(logPosition, leaderAddress);
+			}
+		}
+		else{
+			if(waitingRequest != null)
+			{
+				this.AddLogEntry("Leader not set. Initiating Prepare phase for the waiting Request", Level.INFO);
+				if(waitingRequest.getMsgType() == ClientOPMsgType.READ)
+					initiatePreparePhase(waitingRequest.getTransaction().getTransactionID(), waitingRequest.getTransaction().getReadSet());
+				else
+					initiatePreparePhase(waitingRequest.getTransaction().getTransactionID(), waitingRequest.getTransaction().getWriteSet());
+
+			}
+			else{
+				
+				this.AddLogEntry("Leader not set. No waiting Requests found. Initiaing Prepare phase with dummy values ", Level.INFO);
+				initiatePreparePhase("-1", null);
+			}
 		}
 	}
 

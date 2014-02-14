@@ -67,7 +67,8 @@ public class MetaDS {
 					shardToAcceptorsMap.get(shard).add(tempNode);
 				}
 			}
-			shardToParticipantMap.put(shard, serverAddressMap.get(shardLeader));
+			//shardToParticipantMap.put(shard, serverAddressMap.get(shardLeader));
+			shardToParticipantMap.put(shard, null);
 			orderedShards.add(shard);
 		}
 	}
@@ -135,6 +136,16 @@ public class MetaDS {
 		}
 	}
 
+	public NodeProto getLeaderAddress(String shard)
+	{	
+			return shardToParticipantMap.get(shard);
+	}
+	
+	public void setLeaderAddress(String shard, NodeProto leader)
+	{
+		shardToParticipantMap.put(shard, leader);
+	}
+	
 	private NodeProto getNodeAddress(String rowKey)
 	{
 		int hash = (rowKey.charAt(0) - 'a')% shardToParticipantMap.size();
