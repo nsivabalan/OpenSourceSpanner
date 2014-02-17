@@ -67,8 +67,8 @@ public class MetaDS {
 					shardToAcceptorsMap.get(shard).add(tempNode);
 				}
 			}
-			//shardToParticipantMap.put(shard, serverAddressMap.get(shardLeader));
-			shardToParticipantMap.put(shard, null);
+			shardToParticipantMap.put(shard, serverAddressMap.get(shardLeader));
+			//shardToParticipantMap.put(shard, null);
 			orderedShards.add(shard);
 		}
 	}

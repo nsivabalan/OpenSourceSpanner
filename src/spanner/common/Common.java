@@ -35,7 +35,7 @@ public class Common {
 	public static String tableName = "default_Table";
 	
 	public enum State {ACTIVE, PAUSED};
-	public enum ReplayMsgType {REQEUST, RESPONSE};
+	public enum ReplayMsgType {REQEUST, RESPONSE, ACK};
 	public enum LeaderMsgType {REQUEST, RESPONSE};
 	public enum TransactionType{ STARTED, READINIT, READDONE, WRITEINIT, COMMIT, ABORT, PREPARE_DONE};
 	public enum RequestType {PREPARE, COMMIT, ABORT};

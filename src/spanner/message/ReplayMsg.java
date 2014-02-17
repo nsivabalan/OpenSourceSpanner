@@ -54,7 +54,8 @@ public class ReplayMsg extends MessageBase{
 	{
 		StringBuffer buffer = new StringBuffer();
 		buffer.append("Replay Msg ");
-		buffer.append("Size of entries "+replayEntries.size());
+		buffer.append("Size of entries "+replayEntries.size()+" of ");
+		buffer.append("Type "+this.msgType+"\n");
 		for(ReplayLogEntry logEntry: replayEntries)
 		{
 			buffer.append(logEntry.getLogPosition()+":"+logEntry.getOperation()+"=");

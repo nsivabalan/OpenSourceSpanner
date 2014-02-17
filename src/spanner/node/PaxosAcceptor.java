@@ -40,6 +40,7 @@ import spanner.locks.LockTable;
 import spanner.locks.LockTableOld;
 import spanner.message.ClientOpMsg;
 import spanner.message.LeaderMsg;
+import spanner.message.MessageBase;
 import spanner.message.PaxosDetailsMsg;
 import spanner.message.PaxosMsg;
 import spanner.message.ReplayMsg;
@@ -66,6 +67,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	PLeaderState state ;
 	ArrayList<NodeProto> acceptors;
 	LockTable lockTable = null;
+	private static boolean clearLog ;
 	private static File PAXOSLOG = null;
 	private static FileWriter paxosLogWriter = null;
 	private static BufferedWriter bufferedWriter = null;
@@ -79,6 +81,8 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private HashMap<String, TransactionSource> uidTransMap = null;
 	private ClientOpMsg waitingRequest = null;
 	private PaxosInstance dummyInstance = null;
+	private ArrayList<MessageWrapper> pendingRequests = null;
+	private HashSet<NodeProto> pendingReplayReplicas = null;
 	TwoPC twoPhaseCoordinator = null;
 	private int logCounter = 0;
 	RandomAccessFile logRAF = null;
@@ -122,7 +126,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		localResource = new ResourceHM(this.LOGGER);
 		//to fix: remove after testing
 		//if(nodeId.equalsIgnoreCase("1") || nodeId.equalsIgnoreCase("4"))
-			//isLeader = true;
+		//isLeader = true;
 		dummyInstance = new PaxosInstance(null,  null);
 		state = PLeaderState.INIT;
 		//state = PLeaderState.ACTIVE;
@@ -132,8 +136,14 @@ public class PaxosAcceptor extends Node implements Runnable{
 		logPositionToPaxInstanceMap = new ConcurrentHashMap<Integer, PaxosInstance>();
 		uidTologPositionMap = new HashMap<String, Integer>();
 		logPostionToUIDMap = new HashMap<Integer, String>();
+		pendingRequests = new ArrayList<MessageWrapper>();
+		pendingReplayReplicas = new HashSet<NodeProto>();
+		if(clear.equalsIgnoreCase("T"))
+			this.clearLog = true;
+		else 
+			this.clearLog = false;
 		sendPaxosMsgRequestingAcceptors();
-		
+
 		sendPaxosMsgRequestingLeader(clear);
 	}
 
@@ -204,8 +214,9 @@ public class PaxosAcceptor extends Node implements Runnable{
 		}
 	}
 
-	private void handleReplayLogResponseMsg(ReplayMsg msg)
+	private synchronized void handleReplayLogResponseMsg(ReplayMsg msg)
 	{
+		
 		System.out.println("Handling response for replay msg");
 		ArrayList<ReplayLogEntry> logEntries = msg.getAllReplayEntries();
 		int lastLogPos = getLastPaxosInstanceNumber();
@@ -214,6 +225,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		if(size == 0){
 			this.state = PLeaderState.ACTIVE;
 			this.AddLogEntry("No entries found. Changed to ACTIVE state", Level.INFO);
+			sendReplayAckToLeader();
 		}
 		else
 		{
@@ -223,7 +235,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 				if(i == 0)
 				{
 					int curLogPos = logEntry.getLogPosition();
-					if(curLogPos <= lastLogPos){
+					if(curLogPos < lastLogPos){
 						requestReplayLog(lastLogPos, leaderAddress);
 						validFlag = false;
 						break;
@@ -245,10 +257,57 @@ public class PaxosAcceptor extends Node implements Runnable{
 					this.AddLogEntry("Replayed log. Forwarding request to Leader", Level.INFO);
 					forwardClientRequestToLeader(waitingRequest);
 				}
+				else{
+					this.AddLogEntry("Replayed all log entries. Listening for messages ", Level.INFO);
+					this.state = PLeaderState.ACTIVE;
+					sendReplayAckToLeader();
+				}
 			}
 			else{
-				this.AddLogEntry("Replayed all log entries. Listening for messages ", Level.INFO);
+				this.AddLogEntry("Haven't received proper log entries", Level.INFO);
+				//FIX ME:
 			}
+			
+		}
+	}
+
+	private void sendReplayAckToLeader()
+	{
+		ReplayMsg msg = new ReplayMsg(nodeAddress, ReplayMsgType.ACK);
+		this.AddLogEntry("Sent "+msg, Level.INFO);
+		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
+		pushSocket.connect("tcp://"+leaderAddress.getHost()+":"+leaderAddress.getPort());
+		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());
+		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
+		pushSocket.close();
+	}
+	
+	private void sendReplayLogResponseToLeader()
+	{
+		ReplayMsg msg = new ReplayMsg(nodeAddress, ReplayMsgType.RESPONSE);
+		this.AddLogEntry("Sent "+msg, Level.INFO);
+		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
+		pushSocket.connect("tcp://"+leaderAddress.getHost()+":"+leaderAddress.getPort());
+		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());
+		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
+		pushSocket.close();
+	}
+
+	private synchronized void handleReplayAck(ReplayMsg msg)
+	{
+		if(pendingReplayReplicas.contains(msg.getSource()))
+		{
+			pendingReplayReplicas.remove(msg.getSource());
+			if(pendingReplayReplicas.size() == 0){
+				state = PLeaderState.ACTIVE;
+				this.AddLogEntry("Status changed to ACTIVE", Level.INFO);
+				while(!pendingRequests.isEmpty())
+					handleIncomingMessage(pendingRequests.remove(0));
+				this.AddLogEntry("Done with Pending Requests. Start serving traffic", Level.FINE);
+			}
+		}
+		else{
+			this.AddLogEntry("Replay Ack not expecting from this replica", Level.INFO);
 		}
 	}
 
@@ -271,7 +330,9 @@ public class PaxosAcceptor extends Node implements Runnable{
 	}
 
 	private void handleReplayLogRequestMsg(ReplayMsg msg){
-		System.out.println("Handling request for replay msg ");
+		System.out.println("Handling request for replay msg from "+msg.getSource().getHost()+":"+msg.getSource().getPort());
+		this.state = PLeaderState.DORMANT;
+		pendingReplayReplicas.add(msg.getSource());
 		SendReplayLog(msg.getLastLogPosition(), msg.getSource());
 	}
 
@@ -311,6 +372,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 				line = br.readLine();
 			}
 			br.close();
+			this.AddLogEntry("Prepared replay log entries. Sending response to "+dest.getHost()+":"+dest.getPort(), Level.INFO);
 			sendReplayLogMsg(dest, msg);
 
 		} catch (IOException e) {
@@ -364,7 +426,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 
 	private void sendPaxosMsgRequestingLeader( String isNew)
 	{
-		
+
 		if(leaderAddress == null){
 			this.AddLogEntry("Sending msg to MDS reqeusting leader", Level.INFO);
 			PaxosDetailsMsg msg = new PaxosDetailsMsg(nodeAddress, shard, PaxosDetailsMsgType.LEADER);
@@ -374,7 +436,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 			this.AddLogEntry("I know the leader address. No need for replay log", Level.INFO);
 			state = PLeaderState.ACTIVE;
 		}
-		//}
+
 	}
 
 	private void sendMsgToMDS(NodeProto dest, PaxosDetailsMsg message)
@@ -389,7 +451,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
 		pushSocket.close();
 	}
-	
+
 	private void sendMsgToMDS(NodeProto dest, LeaderMsg message)
 	{
 		//Print msg
@@ -405,7 +467,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 
 	private void sendReplayLogMsg(NodeProto dest, ReplayMsg message)
 	{
-		System.out.println("Sent " + message+" to "+dest.getHost()+":"+dest.getPort());
+		//System.out.println("Sent " + message+" to "+dest.getHost()+":"+dest.getPort());
 		this.AddLogEntry("Sent "+message, Level.INFO);
 
 		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
@@ -518,14 +580,27 @@ public class PaxosAcceptor extends Node implements Runnable{
 
 			MessageWrapper msgwrap = MessageWrapper.getDeSerializedMessage(receivedMsg);
 			//	if(isLeader)	System.out.println("Msg wrap updated ========================== "+receivedMsg);
-			if (msgwrap != null ) {
+			handleIncomingMessage(msgwrap);
 
-				try {
-					if(msgwrap.getmessageclass() == ClientOpMsg.class && this.state == PLeaderState.ACTIVE)
-					{
-						ClientOpMsg msg = (ClientOpMsg) msgwrap.getDeSerializedInnerMessage();
+		}
+		this.close();
+		socket.close();
+		context.term();
+	}
+
+	public synchronized void handleIncomingMessage(MessageWrapper msgwrap)
+	{
+		if (msgwrap != null ) 
+		{
+
+			try {
+				if(msgwrap.getmessageclass() == ClientOpMsg.class)
+				{
+					ClientOpMsg msg = (ClientOpMsg) msgwrap.getDeSerializedInnerMessage();
+					if(state == PLeaderState.ACTIVE){
 						if(msg.getMsgType() == ClientOPMsgType.READ)
 						{
+
 							handleClientReadMessage(msg);
 						}
 						else if(msg.getMsgType() == ClientOPMsgType.WRITE)
@@ -537,14 +612,19 @@ public class PaxosAcceptor extends Node implements Runnable{
 						{
 							handleClientReleaseResourceMsg(msg);
 						}
-
+					}
+					else{
+						pendingRequests.add(msgwrap);
 					}
 
-					if(msgwrap.getmessageclass() == PaxosMsg.class )
-					{
+				}
 
-						PaxosMsg msg = (PaxosMsg)msgwrap.getDeSerializedInnerMessage();
-						if(isLeader) System.out.println("Paxos msg received ++++++++++ "+msg);
+				if(msgwrap.getmessageclass() == PaxosMsg.class )
+				{
+
+					PaxosMsg msg = (PaxosMsg)msgwrap.getDeSerializedInnerMessage();
+					if(isLeader) System.out.println("Paxos msg received ++++++++++ "+msg);
+					if(state != PLeaderState.DORMANT){
 						if(msg.getType() == PaxosMsgType.PREPARE)
 						{
 							handlePrepareMessage(msg);
@@ -552,14 +632,16 @@ public class PaxosAcceptor extends Node implements Runnable{
 						else if(msg.getType() == PaxosMsgType.ACK)
 						{
 							handleAckMessage(msg);
-							
+
 						}
-						else if(msg.getType() == PaxosMsgType.ACCEPT && state == PLeaderState.ACTIVE)
-						{
+						else if(msg.getType() == PaxosMsgType.ACCEPT && state != PLeaderState.INIT)
+						{ 
+
 							handlePaxosAcceptMessage(msg);
 						}
-						else if(msg.getType() == PaxosMsgType.DECIDE && state == PLeaderState.ACTIVE)
+						else if(msg.getType() == PaxosMsgType.DECIDE && state != PLeaderState.INIT)
 						{
+
 							System.out.println("DECIDE MSG from "+msg.getSource().getHost()+":"+msg.getSource().getPort());
 							handlePaxosDecideMessage(msg);
 						}
@@ -567,29 +649,38 @@ public class PaxosAcceptor extends Node implements Runnable{
 							System.out.println("Paxos Msg :: Not falling in any case. ERROR %%%%%%%%%%%%%%%%%%%%%%% "+msg+" %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5");
 						}
 					}
-					if(msgwrap.getmessageclass() == PaxosDetailsMsg.class )
-					{
-						PaxosDetailsMsg msg = (PaxosDetailsMsg)msgwrap.getDeSerializedInnerMessage();
-						if(msg.getMsgType() == PaxosDetailsMsgType.ACCEPTORS)
-							handlePaxosDetailsAcceptorsMsg(msg);
-						else
-							handlePaxosDetailsLeaderMsg(msg);
+					else{
+						pendingRequests.add(msgwrap);
 					}
-					if(msgwrap.getmessageclass() == ReplayMsg.class )
-					{
-						ReplayMsg msg = (ReplayMsg)msgwrap.getDeSerializedInnerMessage();
-						System.out.println("Received replay msg ^^^^^^^^^^^^^^^^^^^^^^^ ");
-						if(msg.getMsgType() == ReplayMsgType.REQEUST)
-							handleReplayLogRequestMsg(msg);
-						else
-							handleReplayLogResponseMsg(msg);
-					}
+				}
+				if(msgwrap.getmessageclass() == PaxosDetailsMsg.class )
+				{
+					PaxosDetailsMsg msg = (PaxosDetailsMsg)msgwrap.getDeSerializedInnerMessage();
+					if(msg.getMsgType() == PaxosDetailsMsgType.ACCEPTORS)
+						handlePaxosDetailsAcceptorsMsg(msg);
+					else
+						handlePaxosDetailsLeaderMsg(msg);
+				}
+				if(msgwrap.getmessageclass() == ReplayMsg.class )
+				{
+					ReplayMsg msg = (ReplayMsg)msgwrap.getDeSerializedInnerMessage();
+					System.out.println("Received replay msg ^^^^^^^^^^^^^^^^^^^^^^^ ");
+					if(msg.getMsgType() == ReplayMsgType.REQEUST)
+						handleReplayLogRequestMsg(msg);
+					else if(msg.getMsgType() == ReplayMsgType.RESPONSE)
+						handleReplayLogResponseMsg(msg);
+					else
+						handleReplayAck(msg);
+				}
 
-					if(msgwrap.getmessageclass() == TwoPCMsg.class )
+				if(msgwrap.getmessageclass() == TwoPCMsg.class )
+				{
+					System.out.println("Two PC msg received ..... ");
+					TwoPCMsg msg = (TwoPCMsg) msgwrap.getDeSerializedInnerMessage();
+					System.out.println("msg :::: "+msg);
+					System.out.println("state "+this.state);
+					if(state == PLeaderState.ACTIVE)
 					{
-						System.out.println("Two PC msg received ..... ");
-						TwoPCMsg msg = (TwoPCMsg) msgwrap.getDeSerializedInnerMessage();
-
 						if(msg.getMsgType() == TwoPCMsgType.INFO)
 						{
 							twoPhaseCoordinator.ProcessInfoMessage(msg);
@@ -599,43 +690,45 @@ public class PaxosAcceptor extends Node implements Runnable{
 							twoPhaseCoordinator.ProcessPrepareMessage(msg);
 						}
 						else if(msg.getMsgType() == TwoPCMsgType.COMMIT){
-							if(msg.isTwoPC())
+							if(msg.isTwoPC()){
 								twoPhaseCoordinator.ProcessCommitMessage(msg);
-							else
+							}
+							else{
 								handleTwoPCCommitMessage(msg);
+							}
 						}
 						else if(msg.getMsgType() == TwoPCMsgType.ABORT){
-							if(msg.isTwoPC())
+							if(msg.isTwoPC()){
 								twoPhaseCoordinator.ProcessAbortMessage(msg);
-							else
+							}
+							else{
 								handleTwoPCAbortMessage(msg);
+							}
 						}
 						else{
 							System.out.println(" TwoPC msg: Not falling in any case. ERROR %%%%%%%%%%%%%%%%%%%%%%% "+msg);
 						}
 					}
-
-
-
-				} catch (ClassNotFoundException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				} catch (Exception e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+					else{
+						pendingRequests.add(msgwrap);
+					}
 				}
 
-			}
-			else{
-				System.out.println("ELSE LOOP ??? ");
+
+
+			} catch (ClassNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
 
 		}
-		this.close();
-		socket.close();
-		context.term();
+		else{
+			System.out.println("ELSE LOOP ??? ");
+		}
 	}
-
 
 	private synchronized void handleClientReadMessage(ClientOpMsg message) throws IOException
 	{
@@ -828,14 +921,14 @@ public class PaxosAcceptor extends Node implements Runnable{
 				logPositionToPaxInstanceMap.put(logPos, paxInstance);
 				if(paxInstance.getAcceptedValue() != null){
 					this.AddLogEntry("Reached majority of ACKS. Sending ACCEPT msgs to all acceptors. (Became the LEADER in the process)", Level.INFO);
-					
+
 					PaxosMsg message = new PaxosMsg( nodeAddress , paxInstance.getUID(), PaxosMsgType.ACCEPT, paxInstance.getBallotNumber(), paxInstance.getAcceptedValue());
 					message.setLogPositionNumber(logPos);
 					SendMessageToAcceptors(message);
 				}
 				else{
 					this.AddLogEntry("Reached majority of ACKS. No Accepted Value found. Elected as a leader", Level.INFO);
-					
+
 				}
 			}
 			else
@@ -867,7 +960,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		msg.setLeader();
 		sendMsgToMDS(metadataService, msg);
 	}
-	
+
 	private void handleTwoPCCommitMessage(TwoPCMsg msg)
 	{
 		System.out.println("IsLeader --------- "+isLeader);
@@ -1318,11 +1411,11 @@ public class PaxosAcceptor extends Node implements Runnable{
 		acceptorsCount = acceptors.size();
 		System.out.println("List of Acceptors "+acceptors);
 		//if(isLeader)
-			//this.state = PLeaderState.ACTIVE;
+		//this.state = PLeaderState.ACTIVE;
 		//	initPaxosInstance();
 	}
 
-	private void handlePaxosDetailsLeaderMsg(PaxosDetailsMsg msg)
+	private synchronized void handlePaxosDetailsLeaderMsg(PaxosDetailsMsg msg)
 	{
 		this.AddLogEntry("Handling Leader info response from MDS", Level.INFO);
 		leaderAddress = msg.getShardLeader();
@@ -1335,11 +1428,18 @@ public class PaxosAcceptor extends Node implements Runnable{
 				isLeader= true;
 				this.state = PLeaderState.ACTIVE;
 				this.AddLogEntry("I am the leader as given by MDS" , Level.INFO);
+				System.out.println("Status "+this.state);
 			}
 			else{
-				System.out.println("Last log position "+logPosition);
-				this.AddLogEntry("Requesting replay log to Leader "+leaderAddress, Level.INFO);
-				requestReplayLog(logPosition, leaderAddress);
+				if(!clearLog){
+					System.out.println("Last log position "+logPosition);
+					this.AddLogEntry("Requesting replay log to Leader "+leaderAddress, Level.INFO);
+					requestReplayLog(logPosition, leaderAddress);
+				}
+				else{
+					this.state = PLeaderState.ACTIVE;
+					this.AddLogEntry("Starting from scratch, nothing to replay", Level.INFO);
+				}
 			}
 		}
 		else{
@@ -1353,7 +1453,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 
 			}
 			else{
-				
+
 				this.AddLogEntry("Leader not set. No waiting Requests found. Initiaing Prepare phase with dummy values ", Level.INFO);
 				initiatePreparePhase("-1", null);
 			}
