@@ -29,7 +29,6 @@ import spanner.message.ClientOpMsg;
 import spanner.message.MetaDataMsg;
 import spanner.message.TwoPCMsg;
 import spanner.metadataservice.MetaDS;
-import spanner.node.Acceptor.TransactionStatus;
 import spanner.protos.Protos.ColElementProto;
 import spanner.protos.Protos.ElementProto;
 import spanner.protos.Protos.ElementsSetProto;

@@ -20,7 +20,6 @@ import spanner.common.Resource;
 import spanner.common.Common.PaxosLeaderState;
 import spanner.message.ClientOpMsg;
 import spanner.message.TwoPCMsg;
-import spanner.node.PaxosLeader.TransactionStatus;
 
 public class TwoPhaseCoordinator extends Node implements Runnable{
 

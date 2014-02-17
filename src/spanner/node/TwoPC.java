@@ -17,9 +17,6 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-
-import spanner.message.BcastMsg;
 import spanner.message.ClientOpMsg;
 import spanner.message.PaxosMsg;
 import spanner.message.TwoPCMsg;
@@ -89,7 +86,6 @@ public class TwoPC implements Runnable{
 
 	public TwoPC(NodeProto nodeAddress, ZMQ.Context context ) throws IOException
 	{
-
 		this.context = context;
 		pendingTransactions = new ArrayList<String>();
 		br = new BufferedReader(new InputStreamReader(System.in));
@@ -99,7 +95,6 @@ public class TwoPC implements Runnable{
 		this.nodeAddress = nodeAddress;
 		uidTransTypeMap = new HashMap<String, TransactionType>();
 		pendingTrans = new HashSet<String>();
-
 	}
 
 
