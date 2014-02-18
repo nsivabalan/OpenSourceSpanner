@@ -1,5 +1,6 @@
 package spanner.common;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -13,6 +14,8 @@ import com.google.gson.*;
 public class Common {
 	private static Properties props;
 	private final static String propsFile ="src/config.props";
+
+	public static String osspanner_home ;
 	
 	static
 	{
@@ -27,10 +30,21 @@ public class Common {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		if(System.getenv("osspanner_home") != null){
+			osspanner_home = System.getenv("osspanner_home");
+		}
+		else
+			osspanner_home = System.getProperty("user.dir");
+		
+		File filePath = new File(osspanner_home+"logs/spannerlogs/");
+		File paxosLog = new File(osspanner_home+"logs/paxoslog/");
+		filePath.mkdirs();
+		paxosLog.mkdirs();
 	}
 	
-	public static String FilePath = "/home/sivabalan/spannerlogs";
-	public static String PaxosLog = "/home/sivabalan/paxoslog/";
+	
+	public static String FilePath = osspanner_home+"logs/spannerlogs";
+	public static String PaxosLog = osspanner_home+"logs/paxoslog/";
 	
 	public static String tableName = "default_Table";
 	

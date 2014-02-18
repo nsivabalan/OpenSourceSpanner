@@ -27,9 +27,9 @@ public class UserClient extends Node implements Runnable{
 	ZMQ.Socket socketPush = null;
 	NodeProto transClient ;
 	NodeProto clientNode;
-	public UserClient(String clientID, int port) throws IOException
+	public UserClient(String clientID, int port, boolean isNew) throws IOException
 	{
-		super(clientID);
+		super(clientID, isNew);
 		context = ZMQ.context(1);
 		InetAddress addr = InetAddress.getLocalHost();
 		clientNode = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(port).build();
@@ -171,11 +171,12 @@ public class UserClient extends Node implements Runnable{
 
 	public static void main(String[] args) throws IOException, ClassNotFoundException {
 
-		if(args.length != 2)
-			System.out.println("Usage: UserCient <ClientID> <port> ");
+		if(args.length != 3)
+			System.out.println("Usage: UserCient <ClientID> <port> <isNewLog>");
 
 		int port = Integer.parseInt(args[1]);
-		UserClient client = new UserClient(args[0], port);
+		boolean isNew = Boolean.parseBoolean(args[2]);
+		UserClient client = new UserClient(args[0], port, isNew);
 		new Thread(client).start();
 		client.init();
 	}

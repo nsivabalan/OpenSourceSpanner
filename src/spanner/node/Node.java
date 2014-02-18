@@ -1,5 +1,7 @@
 package spanner.node;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.logging.FileHandler;
@@ -16,19 +18,24 @@ public class Node {
 
 	protected Common.State NodeState;
 	protected static Logger LOGGER = null;
-	private static FileHandler logFile;
+	private static FileHandler logFileHandler;
+	private static File logFile;
 
-
-	public Node(String nodeId) throws IOException
+	public Node(String nodeId, boolean isNew) throws IOException
 	{
 		this.nodeId = nodeId;
 		this.NodeState = Common.State.ACTIVE;
 		LOGGER = Logger.getLogger(nodeId);
 		//Logging Specific
-		logFile = new FileHandler(Common.FilePath+"/"+this.nodeId+".log", true);
-		logFile.setFormatter(new SimpleFormatter());
+		
+		logFile = new File(Common.FilePath+"/"+this.nodeId+".log");
+		if(isNew)
+			new FileOutputStream(logFile, false).close();
+		
+		logFileHandler = new FileHandler(Common.FilePath+"/"+this.nodeId+".log", true);
+		logFileHandler.setFormatter(new SimpleFormatter());
 		LOGGER.setLevel(Level.INFO); //Sets the default level if not provided.		
-		LOGGER.addHandler(logFile);
+		LOGGER.addHandler(logFileHandler);
 		LOGGER.setUseParentHandlers(false);
 	}	
 
@@ -38,7 +45,7 @@ public class Node {
 	 * @param level
 	 */
 	public void AddLogEntry(String message, Level level){	
-		//System.out.println(message);
+		System.out.println(message);
 		LOGGER.logp(level, this.getClass().toString(), "", message);		
 	}
 

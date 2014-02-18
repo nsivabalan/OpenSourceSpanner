@@ -26,7 +26,7 @@ import spanner.common.ResourceHM;
 import spanner.common.MessageWrapper;
 import spanner.common.Common;
 
-public class TwoPC implements Runnable{
+public class TwoPC extends Node implements Runnable{
 
 	ArrayList<String> pendingTransactions = null;
 	NodeProto nodeAddress = null;
@@ -64,17 +64,15 @@ public class TwoPC implements Runnable{
 
 
 	private Map<String, TransactionStatus> uidTransactionStatusMap;
-	private static ResourceHM localResource = null;
 	protected static Logger LOGGER = null;
 
-	public TwoPC(NodeProto nodeAddress, ZMQ.Context context ) throws IOException
+	public TwoPC(String shard, NodeProto nodeAddress, ZMQ.Context context , boolean isNew) throws IOException
 	{
+		super(shard+"_TPC", isNew);
 		this.context = context;
 		pendingTransactions = new ArrayList<String>();
 		br = new BufferedReader(new InputStreamReader(System.in));
 		this.uidTransactionStatusMap = new LinkedHashMap<String, TransactionStatus>();
-		LOGGER =  Logger.getLogger("TwoPC");
-		localResource = new ResourceHM(this.LOGGER);
 		this.nodeAddress = nodeAddress;
 		uidTransTypeMap = new HashMap<String, TransactionType>();
 		pendingTrans = new HashSet<String>();
@@ -345,24 +343,6 @@ public class TwoPC implements Runnable{
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
 		socket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
 	}
-
-	/**
-	 * Method to append content to Log with custom Log Level
-	 * @param message
-	 * @param level
-	 */
-	public void AddLogEntry(String message, Level level){		
-		LOGGER.logp(level, this.getClass().toString(), "", message);		
-	}
-
-	/**
-	 * Method  to append content to Log with defualt Log Level(INFO)
-	 * @param message
-	 */
-	public void AddLogEntry(String message){		
-		this.AddLogEntry(message, Level.INFO);		
-	}
-
 
 	/*
 	public void ProcessClientReadMessage(ClientOpMsg message)

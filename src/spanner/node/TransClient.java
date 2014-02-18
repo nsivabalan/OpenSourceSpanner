@@ -50,14 +50,14 @@ public class TransClient extends Node implements Runnable{
 	NodeProto clientNode;
 	HashMap<String, NodeProto> clientMappings ;
 
-	public TransClient(String clientID, int port) throws IOException
+	public TransClient(String clientID, int port, boolean isNew) throws IOException
 	{
-		super(clientID);
+		super(clientID, isNew);
 		context = ZMQ.context(1);
 		InetAddress addr = InetAddress.getLocalHost();
 		clientNode = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(port).build();
 		socket = context.socket(ZMQ.PULL);
-		System.out.println(" Listening to "+Common.getLocalAddress(port));
+		//System.out.println(" Listening to "+Common.getLocalAddress(port));
 		socket.bind(Common.getLocalAddress(port));
 		this.port = port;
 		String[] mds = Common.getProperty("mds").split(":");
@@ -118,19 +118,15 @@ public class TransClient extends Node implements Runnable{
 						ClientOpMsg message = (ClientOpMsg)msgwrap.getDeSerializedInnerMessage();
 						if(message.getMsgType() == ClientOPMsgType.READ_RESPONSE)
 						{
-							System.out.println("Processing Read Response ::::::: ");
 							handleReadResponse(message);
 						}
 						else{
-							System.out.println("Processing Client Op MSG ::::::: ");
 							ProcessClientOpMessage(message);
 						}
 					}
 					else if (msgwrap.getmessageclass() == TwoPCMsg.class)
 					{
-						System.out.println("Processing TwoPCMsg from TPC ::::::: ");
 						TwoPCMsg message = (TwoPCMsg)msgwrap.getDeSerializedInnerMessage();
-						System.out.println("Client Response "+message+" >>>>>");
 						handleTwoPCResponse(message);
 					}
 				} catch (ClassNotFoundException e) {
@@ -149,6 +145,7 @@ public class TransClient extends Node implements Runnable{
 	 */
 	private void handleMetaDataRequest(MetaDataMsg msg)
 	{
+		AddLogEntry("Handling Meta data request "+msg);
 		String uid = java.util.UUID.randomUUID().toString();
 		clientMappings.put(uid, msg.getSource());
 		MetaDataMsg message = new MetaDataMsg(clientNode, msg.getReadSet(), msg.getWriteSet(), MetaDataMsgType.REQEUST, uid);
@@ -161,11 +158,9 @@ public class TransClient extends Node implements Runnable{
 	 */
 	private void sendMetaDataMsg(MetaDataMsg msg)
 	{
-		System.out.println("Sending Client Request "+msg);
+		AddLogEntry("Sending Meta data request "+msg+" to "+metadataService.getHost()+":"+metadataService.getPort());
 		socketPush = context.socket(ZMQ.PUSH);
-		//System.out.println(" "+metadataService.getHost()+":"+metadataService.getPort());
 		socketPush.connect("tcp://"+metadataService.getHost()+":"+metadataService.getPort());
-		System.out.println(" "+socketPush.getLinger());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());
 		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
 		socketPush.close();
@@ -177,6 +172,7 @@ public class TransClient extends Node implements Runnable{
 	 */
 	private void handleMetaDataResponse(MetaDataMsg msg)
 	{
+		AddLogEntry("Handling meta data response "+msg);
 		TransactionMetaDataProto transaction = msg.getTransaction();
 		TransactionProto trans = TransactionProto.newBuilder()
 				.setTransactionID(transaction.getTransactionID())
@@ -186,8 +182,8 @@ public class TransClient extends Node implements Runnable{
 				.setReadSetServerToRecordMappings(transaction.getReadSetServerToRecordMappings())
 				.setWriteSetServerToRecordMappings(transaction.getWriteSetServerToRecordMappings())
 				.build();
-		System.out.println("Trans details "+trans);
-		System.out.println(" Chosen TPC <<<<<< "+transaction.getTwoPC());
+		
+		
 		TransactionStatus transStatus = new TransactionStatus(trans);
 		transStatus.twoPC = transaction.getTwoPC();
 
@@ -508,13 +504,14 @@ public class TransClient extends Node implements Runnable{
 
 	public static void main(String[] args) throws IOException, ClassNotFoundException {
 
-		if(args.length != 2)
+		if(args.length != 3)
 		{
-			System.out.println("ClientID port ");
+			System.out.println("ClientID port IsNewLog ");
 		}
 
 		int port = Integer.parseInt(args[1]);
-		TransClient client = new TransClient(args[0], port);
+		boolean isNew = Boolean.parseBoolean(args[2]);
+		TransClient client = new TransClient(args[0], port, isNew);
 		new Thread(client).start();
 	}
 

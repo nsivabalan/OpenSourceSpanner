@@ -88,9 +88,9 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private static ResourceHM localResource = null;
 	private static FileHandler logFile = null;
 
-	public PaxosAcceptor(String shard, String nodeId, String clear) throws IOException
+	public PaxosAcceptor(String shard, String nodeId, boolean isNew) throws IOException
 	{
-		super(nodeId);
+		super(nodeId, isNew);
 		this.shard = shard;
 		context = ZMQ.context(1);
 		//ZMQ.Context context = ZMQ.context(1);
@@ -98,7 +98,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		String[] hostDetails = Common.getProperty(nodeId).split(":");
 		socket = context.socket(ZMQ.PULL); 
 		//create Log file
-		createLogFile(shard, nodeId, clear);
+		createLogFile(shard, nodeId, isNew);
 		//FIX ME
 		String hostName = null;
 		if(hostDetails[0].contains("127.0.0.1") || hostDetails[0].contains("localhost"))
@@ -108,7 +108,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		socket.bind("tcp://"+hostName+":"+hostDetails[1]);
 		InetAddress addr = InetAddress.getLocalHost();
 		nodeAddress = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(Integer.parseInt(hostDetails[1])).build();
-		twoPhaseCoordinator = new TwoPC(nodeAddress, context);
+		twoPhaseCoordinator = new TwoPC(shard, nodeAddress, context, isNew);
 		new Thread(twoPhaseCoordinator).start();
 
 		AddLogEntry("Participant node address "+nodeAddress.getHost()+":"+nodeAddress.getPort(), Level.FINE);
@@ -129,12 +129,9 @@ public class PaxosAcceptor extends Node implements Runnable{
 		logPostionToUIDMap = new HashMap<Integer, String>();
 		pendingRequests = new ArrayList<MessageWrapper>();
 		pendingReplayReplicas = new HashSet<NodeProto>();
-		if(clear.equalsIgnoreCase("T"))
-			this.clearLog = true;
-		else 
-			this.clearLog = false;
+		this.clearLog = isNew;
 		sendPaxosMsgRequestingAcceptors();
-		sendPaxosMsgRequestingLeader(clear);
+		sendPaxosMsgRequestingLeader();
 	}
 
 	/**
@@ -176,13 +173,13 @@ public class PaxosAcceptor extends Node implements Runnable{
 	 * @throws NumberFormatException
 	 * @throws IOException
 	 */
-	private void createLogFile(String shard, String nodeId, String isClear) throws NumberFormatException, IOException
+	private void createLogFile(String shard, String nodeId, boolean isClear) throws NumberFormatException, IOException
 	{
 		PAXOSLOG = new File(Common.PaxosLog+"/"+shard+"/"+nodeId+"_.log");
 		AddLogEntry("Creating log file "+PAXOSLOG.getAbsolutePath());
 		if(PAXOSLOG.exists())
 		{
-			if(isClear.equalsIgnoreCase("T"))
+			if(isClear)
 				new FileOutputStream(PAXOSLOG, false).close();			
 		}
 		else
@@ -660,7 +657,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		sendMsgToMDS(metadataService ,msg);
 	}
 
-	private void sendPaxosMsgRequestingLeader( String isNew)
+	private void sendPaxosMsgRequestingLeader()
 	{
 
 		if(leaderAddress == null){
@@ -854,7 +851,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		}
 		else{
 			waitingRequest = message;
-			sendPaxosMsgRequestingLeader("F");
+			sendPaxosMsgRequestingLeader();
 		}
 	}
 
@@ -906,7 +903,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		else{
 			AddLogEntry("I am not the leader. Request Leader info from MDS", Level.INFO);
 			waitingRequest = msg;
-			sendPaxosMsgRequestingLeader("F");
+			sendPaxosMsgRequestingLeader();
 		}
 	}
 
@@ -1526,7 +1523,6 @@ public class PaxosAcceptor extends Node implements Runnable{
 			}
 			buffer.append("::");
 		}
-
 		try {
 			PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(PAXOSLOG, true)));
 			out.println(buffer.toString());
@@ -1541,7 +1537,8 @@ public class PaxosAcceptor extends Node implements Runnable{
 	{
 		if(args.length <= 2)
 			throw new IllegalArgumentException("Usage: PAcceptor <ShardID> <nodeId> T/F(clear log file or no)");
-		PaxosAcceptor acceptor = new PaxosAcceptor(args[0], args[1], args[2]);
+		boolean isNew = Boolean.parseBoolean(args[2]);
+		PaxosAcceptor acceptor = new PaxosAcceptor(args[0], args[1], isNew);
 		new Thread(acceptor).start();
 		acceptor.executeDaemon();
 	}
