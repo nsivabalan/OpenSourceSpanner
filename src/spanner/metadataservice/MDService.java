@@ -42,16 +42,16 @@ public class MDService extends Node implements Runnable{
 		socket = context.socket(ZMQ.PULL);
 		System.out.println(" Listening to "+Common.getLocalAddress(port));
 		socket.bind(Common.getLocalAddress(port));
-		createLogFiles();
+	//	createLogFiles();
 		metadataService = new MetaDS();
 
 	}
 	
 	
-	private void createLogFiles()
+	/*private void createLogFiles()
 	{
 		
-	}
+	}*/
 	
 	public void run()
 	{
@@ -100,6 +100,10 @@ public class MDService extends Node implements Runnable{
 		context.term();
 	}
 	
+	/**
+	 * Method to update Leader info for any shard
+	 * @param msg
+	 */
 	private void updateLeaderInfo(LeaderMsg msg)
 	{
 		this.AddLogEntry("Leader Info received for "+msg.getShard()+", chosen leader "+msg.getSource().getHost()+":"+msg.getSource().getPort(), Level.INFO);
@@ -109,6 +113,10 @@ public class MDService extends Node implements Runnable{
 		}
 	}
 	
+	/**
+	 * Method to process requesting acceptors
+	 * @param msg
+	 */
 	private void ProcessRequestAcceptors(PaxosDetailsMsg msg)
 	{
 		ArrayList<NodeProto> acceptors = metadataService.getAcceptors(msg.getShardId());
@@ -117,6 +125,10 @@ public class MDService extends Node implements Runnable{
 		SendPaxosDetailsMsg(msg.getSource(), message);
 	}
 	
+	/**
+	 * Method to process requesting Leader
+	 * @param msg
+	 */
 	private void ProcessRequestLeader(PaxosDetailsMsg msg)
 	{
 		this.AddLogEntry(msg.getSource().getHost()+":"+msg.getSource().getPort()+" requesting Leader Address", Level.INFO);
@@ -126,6 +138,10 @@ public class MDService extends Node implements Runnable{
 		SendPaxosDetailsMsg(msg.getSource(), message);
 	}
 	
+	/**
+	 * Method to process msg requesting metadata information
+	 * @param msg
+	 */
 	private void ProcessMetaDataMessage(MetaDataMsg msg)
 	{
 		TransactionMetaDataProto trans = metadataService.getTransactionDetails(msg.getSource(), msg.getReadSet(), msg.getWriteSet(), msg.getUID());
@@ -134,26 +150,32 @@ public class MDService extends Node implements Runnable{
 		SendMetaData(msg.getSource(), message);
 	}
 	
-	
+	/**
+	 * Method to send Paxos Details msg to replica
+	 * @param dest
+	 * @param msg
+	 */
 	private void SendPaxosDetailsMsg(NodeProto dest, PaxosDetailsMsg msg)
 	{
-		System.out.println("Sending Client Request "+msg);
+		AddLogEntry("Sending Paxos Details Msg "+msg);
 		socketPush = context.socket(ZMQ.PUSH);
-	//	System.out.println(" "+dest.getHost()+":"+dest.getPort());
 		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
-		System.out.println(" "+socketPush.getLinger());
+		//System.out.println(" "+socketPush.getLinger());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());
 		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
 		socketPush.close();
 	}
 	
+	/**
+	 * Method to send Metadata msg to trans client
+	 * @param dest
+	 * @param msg
+	 */
 	private void SendMetaData(NodeProto dest, MetaDataMsg msg)
 	{
-		System.out.println("Sending Client Request "+msg);
+		AddLogEntry("Sending msg "+msg);
 		socketPush = context.socket(ZMQ.PUSH);
-		System.out.println(" "+dest.getHost()+":"+dest.getPort());
 		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
-		System.out.println(" "+socketPush.getLinger());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());
 		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
 		socketPush.close();
@@ -165,7 +187,6 @@ public class MDService extends Node implements Runnable{
 			MDService obj = new MDService("MDS Service");
 			new Thread(obj).start();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		

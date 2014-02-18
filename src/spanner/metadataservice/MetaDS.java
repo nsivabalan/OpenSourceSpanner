@@ -9,6 +9,7 @@ import java.util.Random;
 
 import spanner.common.Common;
 import spanner.message.PaxosDetailsMsg;
+import spanner.node.Node;
 import spanner.protos.*;
 import spanner.protos.Protos.ColElementProto;
 import spanner.protos.Protos.ElementProto;
@@ -22,7 +23,7 @@ import spanner.protos.Protos.TransactionMetaDataProto;
 import spanner.protos.Protos.TransactionProto;
 import spanner.protos.Protos.TransactionProto.TransactionStatusProto;
 
-public class MetaDS {
+public class MetaDS extends Node{
 
 	HashMap<String, NodeProto> serverAddressMap ;
 	HashMap<String, NodeProto> shardToParticipantMap;
@@ -31,6 +32,7 @@ public class MetaDS {
 
 	public MetaDS() throws IOException
 	{
+		super("MDS");
 		serverAddressMap = new HashMap<String,NodeProto>();
 		shardToParticipantMap = new HashMap<String, NodeProto>();
 		shardToAcceptorsMap = new HashMap<String, ArrayList<NodeProto>>();
@@ -73,69 +75,6 @@ public class MetaDS {
 		}
 	}
 
-
-	/*final class TransactionState {
-
-		String uid ;
-		Common.TransactionType transState;
-		HashMap<String, ArrayList<String>> readSet;
-		HashMap<String, HashMap<String, String>> writeSet;
-		HashMap<NodeProto, HashMap<String, ArrayList<String>> > readSetServerInfoMap;
-		HashMap<NodeProto, HashMap<String, HashMap<String, String>> > writeSetServerInfoMap;
-		String clientRoutingKey;
-		HostAddress twoPCAddress;
-
-
-		public TransactionState(String uid,HashMap<String, ArrayList<String>> readSet, HashMap<String, HashMap<String, String>> writeSet)
-		{			
-			this.uid = uid;
-			readSet = new HashMap<String, ArrayList<String>>();
-			writeSet = new HashMap<String, HashMap<String, String>>();
-			readSetServerInfoMap = new HashMap<NodeProto, HashMap<String, ArrayList<String>> >();
-			writeSetServerInfoMap = new HashMap<NodeProto, HashMap<String, HashMap<String, String>>>();
-			this.writeSet = writeSet;
-			this.readSet = readSet;
-			for(String key: readSet.keySet())
-			{
-				NodeProto tempAddress = getNodeAddress(key);
-				if(readSetServerInfoMap.containsKey(tempAddress))
-				{
-					readSetServerInfoMap.get(tempAddress).put(key, readSet.get(key));
-				}
-				else{
-					HashMap<String, ArrayList<String>> tempRecord = new HashMap<String, ArrayList<String>>();
-					tempRecord.put(key, readSet.get(key));
-					readSetServerInfoMap.put(tempAddress, tempRecord);
-				}
-			}
-
-			for(String key: writeSet.keySet())
-			{
-				NodeProto tempAddress = getNodeAddress(key);
-				if(writeSetServerInfoMap.containsKey(tempAddress))
-				{
-					writeSetServerInfoMap.get(tempAddress).put(key, writeSet.get(key));
-				}
-				else{
-					HashMap<String, HashMap<String, String>> tempRecord = new HashMap<String, HashMap<String, String>>();
-					tempRecord.put(key, writeSet.get(key));
-					writeSetServerInfoMap.put(tempAddress, tempRecord);
-				}
-			}
-		}			
-	}*/
-
-	static class HostAddress{
-		String hostname;
-		int port;
-
-		public HostAddress(String hostname, int port)
-		{
-			this.hostname = hostname;
-			this.port = port;
-		}
-	}
-
 	public NodeProto getLeaderAddress(String shard)
 	{	
 			return shardToParticipantMap.get(shard);
@@ -154,8 +93,7 @@ public class MetaDS {
 
 	public NodeProto getShardLeader(String shardLeader)
 	{
-		return shardToParticipantMap.get(shardLeader);
-		
+		return shardToParticipantMap.get(shardLeader);		
 	}
 	
 	public ArrayList<NodeProto> getAcceptors(String shardId)
@@ -163,10 +101,16 @@ public class MetaDS {
 		return shardToAcceptorsMap.get(shardId);
 	}
 	
+	/**
+	 * Method to generate meta data info for an incoming transaction
+	 * @param clientAddress
+	 * @param readSet
+	 * @param writeSet
+	 * @param uid
+	 * @return
+	 */
 	public TransactionMetaDataProto getTransactionDetails(NodeProto clientAddress, HashMap<String, ArrayList<String>> readSet, HashMap<String, HashMap<String, String>> writeSet, String uid)
 	{
-		
-		//TransactionState transaction = new TransactionState(uid, readSet, writeSet);
 		ElementsSetProto.Builder readSetBuilder = ElementsSetProto.newBuilder();
 		readSetBuilder.setElementsSetType(ElementsSetTypeProto.READSET);
 		ElementToServerMapping.Builder readSetServerToRecordBuilder = ElementToServerMapping.newBuilder();
@@ -259,15 +203,11 @@ public class MetaDS {
 					.setPartitionServer(shardProto).setElements(writeMapBuilder.build()).build());
 		}
 
-
-
 		NodeProto twoPC = null;
 		if(writeSet.size() > 0)
 		{
 			int size = writeSet.size();
 			int rand = new Random().nextInt(size);
-			System.out.println("Random no chosen "+rand);
-			System.out.println("Write set size "+size);
 			Iterator<String> itr = writeSet.keySet().iterator();
 			int count = 0;
 			while(itr.hasNext())
@@ -282,7 +222,7 @@ public class MetaDS {
 				count++;
 
 			}
-			System.out.println("TPC chosen ****** "+twoPC);
+			AddLogEntry("TPC chosen "+twoPC);
 			TransactionMetaDataProto transaction = TransactionMetaDataProto.newBuilder()
 					.setTransactionID(uid)
 					.setTransactionStatus(TransactionMetaDataProto.TransactionStatusProto.ACTIVE)

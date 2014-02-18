@@ -19,7 +19,6 @@ public class Node {
 	private static FileHandler logFile;
 
 
-
 	public Node(String nodeId) throws IOException
 	{
 		this.nodeId = nodeId;
@@ -33,15 +32,25 @@ public class Node {
 		LOGGER.setUseParentHandlers(false);
 	}	
 
-	
-
-	//Add a new log entry.
+	/**
+	 * Method to append content to Log with custom Log Level
+	 * @param message
+	 * @param level
+	 */
 	public void AddLogEntry(String message, Level level){	
-		System.out.println(message);
+		//System.out.println(message);
 		LOGGER.logp(level, this.getClass().toString(), "", message);		
 	}
 
+	/**
+	 * Method  to append content to Log with defualt Log Level(INFO)
+	 * @param message
+	 */
+	public void AddLogEntry(String message){	
+		AddLogEntry(message, Level.INFO);		
+	}
 
+	
 	public void close()
 	{
 		logFile.close();

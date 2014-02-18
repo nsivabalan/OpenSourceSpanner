@@ -34,7 +34,7 @@ public class UserClient extends Node implements Runnable{
 		InetAddress addr = InetAddress.getLocalHost();
 		clientNode = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(port).build();
 		socket = context.socket(ZMQ.PULL);
-		System.out.println(" Listening to "+Common.getLocalAddress(port));
+		AddLogEntry(" Listening to "+Common.getLocalAddress(port));
 		socket.bind(Common.getLocalAddress(port));
 		this.port = port;
 		String[] transcli = Common.getProperty("transClient").split(":");
@@ -45,7 +45,41 @@ public class UserClient extends Node implements Runnable{
 
 	}
 
-	public void sendMessages() throws NumberFormatException, IOException
+
+	public void run()
+	{
+		AddLogEntry("Waiting for messages "+socket.toString());
+		while (!Thread.currentThread ().isInterrupted ()) {
+			String receivedMsg = new String( socket.recv(0)).trim();
+			MessageWrapper msgwrap = MessageWrapper.getDeSerializedMessage(receivedMsg);
+			if (msgwrap != null)
+			{
+				try {
+					if (msgwrap.getmessageclass() == ClientOpMsg.class)
+					{
+						ClientOpMsg message = (ClientOpMsg)msgwrap.getDeSerializedInnerMessage();
+						ProcessClientResponse(message);
+					}
+					else {
+						throw new IllegalStateException("Message not expected of type"+msgwrap.getmessageclass()+". Ignoring silently");
+					}
+				} catch (ClassNotFoundException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		this.close();
+		socket.close();
+		context.term();
+	}
+
+
+	/**
+	 * Method used to get input data from user
+	 * @throws NumberFormatException
+	 * @throws IOException
+	 */
+	public void init() throws NumberFormatException, IOException
 	{
 		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 		System.out.println("1.Initiate Trans 2. Exit");
@@ -95,25 +129,30 @@ public class UserClient extends Node implements Runnable{
 			}
 
 			initiateTrans(readSet, writeSet);
-
+			System.out.println("Enter option 1.New Trans 2.Exit ");
+			option = Integer.parseInt(br.readLine());
 		}
-
-		System.out.println("Enter option 1.Continue 2.Exit ");
-		option = Integer.parseInt(br.readLine());
 	}
 
-
+	/**
+	 * Method to initiate transaction
+	 * @param readSet
+	 * @param writeSet
+	 */
 	private void initiateTrans(HashMap<String, ArrayList<String>> readSet, HashMap<String, HashMap<String, String>> writeSet)
 	{
 		MetaDataMsg msg = new MetaDataMsg(clientNode, readSet, writeSet, MetaDataMsgType.REQEUST);
 		sendMetaDataMsg(msg);
 	}
 
+	/**
+	 * Method to send msg to MDS
+	 * @param msg
+	 */
 	private void sendMetaDataMsg(MetaDataMsg msg)
 	{
-		System.out.println("Sending Client Request "+msg);
+		AddLogEntry("Sending Client Request "+msg);
 		socketPush = context.socket(ZMQ.PUSH);
-		//System.out.println(" "+metadataService.getHost()+":"+metadataService.getPort());
 		socketPush.connect("tcp://"+transClient.getHost()+":"+transClient.getPort());
 		System.out.println(" "+socketPush.getLinger());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());
@@ -121,55 +160,24 @@ public class UserClient extends Node implements Runnable{
 		socketPush.close();
 	}
 
-
-	public void run()
-	{
-		System.out.println("Waiting for messages "+socket.toString());
-		while (!Thread.currentThread ().isInterrupted ()) {
-			String receivedMsg = new String( socket.recv(0)).trim();
-			//System.out.println("Received Messsage "+receivedMsg);
-			MessageWrapper msgwrap = MessageWrapper.getDeSerializedMessage(receivedMsg);
-			if (msgwrap != null)
-			{
-				try {
-					if (msgwrap.getmessageclass() == ClientOpMsg.class)
-					{
-						ClientOpMsg message = (ClientOpMsg)msgwrap.getDeSerializedInnerMessage();
-
-						ProcessClientResponse(message);
-
-					}
-					else {
-
-					}
-				} catch (ClassNotFoundException e) {
-					e.printStackTrace();
-				}
-			}
-		}
-		this.close();
-		socket.close();
-		context.term();
-	}
-
-
+	/**
+	 * Method to process transaction response
+	 * @param msg
+	 */
 	private void ProcessClientResponse(ClientOpMsg msg)
 	{
-		System.out.println("Received Response from "+msg.getSource());
-		System.out.println(" "+msg.getTransaction());
+		AddLogEntry("Received Response "+msg);
 	}
 
 	public static void main(String[] args) throws IOException, ClassNotFoundException {
 
 		if(args.length != 2)
-		{
-			System.out.println("ClientID port ");
-		}
+			System.out.println("Usage: UserCient <ClientID> <port> ");
 
 		int port = Integer.parseInt(args[1]);
 		UserClient client = new UserClient(args[0], port);
 		new Thread(client).start();
-		client.sendMessages();
+		client.init();
 	}
 
 }
