@@ -30,9 +30,9 @@ public class MetaDS extends Node{
 	HashMap<String, ArrayList<NodeProto>> shardToAcceptorsMap;
 	ArrayList<String> orderedShards = new ArrayList<String>();
 
-	public MetaDS() throws IOException
+	public MetaDS(boolean isNew) throws IOException
 	{
-		super("MDS");
+		super("MDS", isNew);
 		serverAddressMap = new HashMap<String,NodeProto>();
 		shardToParticipantMap = new HashMap<String, NodeProto>();
 		shardToAcceptorsMap = new HashMap<String, ArrayList<NodeProto>>();

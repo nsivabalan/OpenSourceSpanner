@@ -134,7 +134,6 @@ public class TransClient extends Node implements Runnable{
 				}
 			}
 		}
-		this.close();
 		socket.close();
 		context.term();
 	}

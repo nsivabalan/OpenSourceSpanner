@@ -68,7 +68,6 @@ public class UserClient extends Node implements Runnable{
 				}
 			}
 		}
-		this.close();
 		socket.close();
 		context.term();
 	}

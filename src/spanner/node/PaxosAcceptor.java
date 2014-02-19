@@ -252,7 +252,6 @@ public class PaxosAcceptor extends Node implements Runnable{
 			MessageWrapper msgwrap = MessageWrapper.getDeSerializedMessage(receivedMsg);			
 			handleIncomingMessage(msgwrap);
 		}
-		this.close();
 		socket.close();
 		context.term();
 	}

@@ -58,9 +58,4 @@ public class Node {
 	}
 
 	
-	public void close()
-	{
-		logFile.close();
-	}
-	
 }

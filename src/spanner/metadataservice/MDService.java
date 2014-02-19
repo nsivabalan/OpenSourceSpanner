@@ -30,9 +30,9 @@ public class MDService extends Node implements Runnable{
 	MetaDS metadataService ;
 	NodeProto mdsNode;
 	
-	public MDService(String MDservice) throws IOException
+	public MDService(String MDservice, boolean isNew) throws IOException
 	{
-		super(MDservice);
+		super(MDservice, isNew);
 		context = ZMQ.context(1);
 
 		String[] mds = Common.getProperty("mds").split(":");
@@ -43,7 +43,7 @@ public class MDService extends Node implements Runnable{
 		System.out.println(" Listening to "+Common.getLocalAddress(port));
 		socket.bind(Common.getLocalAddress(port));
 	//	createLogFiles();
-		metadataService = new MetaDS();
+		metadataService = new MetaDS(isNew);
 
 	}
 	
@@ -184,7 +184,10 @@ public class MDService extends Node implements Runnable{
 	public static void main(String args[])
 	{
 		try {
-			MDService obj = new MDService("MDS Service");
+			if(args.length < 1)
+				throw new IllegalArgumentException("Usage: MDService T/F(clear log file or no)");
+			boolean isNew = Boolean.parseBoolean(args[0]);
+			MDService obj = new MDService("MDS Service", isNew);
 			new Thread(obj).start();
 		} catch (IOException e) {
 			e.printStackTrace();
