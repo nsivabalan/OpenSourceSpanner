@@ -187,7 +187,7 @@ public class MDService extends Node implements Runnable{
 			if(args.length < 1)
 				throw new IllegalArgumentException("Usage: MDService T/F(clear log file or no)");
 			boolean isNew = Boolean.parseBoolean(args[0]);
-			MDService obj = new MDService("MDS Service", isNew);
+			MDService obj = new MDService("MDS_Service", isNew);
 			new Thread(obj).start();
 		} catch (IOException e) {
 			e.printStackTrace();
