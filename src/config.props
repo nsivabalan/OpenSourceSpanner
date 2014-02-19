@@ -10,5 +10,5 @@ S2Leader=20004
 5=localhost:20002
 6=localhost:20003
 shards=S1,S2
-mds=localhost:11111
+mds=54.213.197.167:11111
 transClient=localhost:12345
