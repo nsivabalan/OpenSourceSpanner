@@ -65,8 +65,11 @@ public class PaxosDetailsMsg extends MessageBase{
 			bf.append("Shard ID - "+this.shardID);
 		if(shardLeader != null)
 		bf.append("Shard Leader - "+shardLeader);
-		if(replicas != null)
-		bf.append("Replicas - "+replicas);
+		if(replicas != null){
+		bf.append("Replicas - \n");
+		for(NodeProto node: replicas)
+			bf.append("   "+node.getHost()+":"+node.getPort()+"\n");
+		}
 		
 		return bf.toString();
 	}

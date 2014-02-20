@@ -53,7 +53,7 @@ public class ReplayMsg extends MessageBase{
 	public String toString()
 	{
 		StringBuffer buffer = new StringBuffer();
-		buffer.append("Replay Msg ");
+		buffer.append("Replay Msg \n");
 		buffer.append("Size of entries "+replayEntries.size()+" of ");
 		buffer.append("Type "+this.msgType+"\n");
 		for(ReplayLogEntry logEntry: replayEntries)
@@ -62,7 +62,7 @@ public class ReplayMsg extends MessageBase{
 			ElementsSetProto records = logEntry.getLogEntry();
 			for(ElementProto elementProto : records.getElementsList())
 			{
-				buffer.append(elementProto.getRow()+":");
+				buffer.append("   "+elementProto.getRow()+":");
 				for(ColElementProto colElement: elementProto.getColsList())
 				{
 					buffer.append(colElement.getCol()+","+colElement.getValue()+";");

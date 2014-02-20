@@ -101,13 +101,15 @@ public class PaxosAcceptor extends Node implements Runnable{
 		createLogFile(shard, nodeId, isNew);
 		//FIX ME
 		String hostName = null;
-		if(hostDetails[0].contains("127.0.0.1") || hostDetails[0].contains("localhost"))
+		/*if(hostDetails[0].contains("127.0.0.1") || hostDetails[0].contains("localhost"))
 			hostName = "127.0.0.1";
 		else
-			hostName = hostDetails[0];
-		socket.bind("tcp://"+hostName+":"+hostDetails[1]);
+			hostName = hostDetails[0];*/
+		socket.bind("tcp://*:"+hostDetails[1]);
 		InetAddress addr = InetAddress.getLocalHost();
-		nodeAddress = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(Integer.parseInt(hostDetails[1])).build();
+		//System.out.println("Address :"+addr.getHostAddress());
+		nodeAddress = NodeProto.newBuilder().setHost(hostDetails[0]).setPort(Integer.parseInt(hostDetails[1])).build();
+		System.out.println("Address :: "+nodeAddress.getHost()+":"+nodeAddress.getPort());
 		twoPhaseCoordinator = new TwoPC(shard, nodeAddress, context, isNew);
 		new Thread(twoPhaseCoordinator).start();
 

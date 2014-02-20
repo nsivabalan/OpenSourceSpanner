@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import spanner.common.Common.MetaDataMsgType;
+import spanner.protos.Protos.ColElementProto;
+import spanner.protos.Protos.ElementProto;
 import spanner.protos.Protos.NodeProto;
 import spanner.protos.Protos.TransactionMetaDataProto;
 import spanner.protos.Protos.TransactionProto;
@@ -74,13 +76,23 @@ public class MetaDataMsg extends MessageBase{
 	@Override
 	public String toString() {
 		StringBuffer bf = new StringBuffer();
-		bf.append("Source - "+source.getHost()+":"+this.source.getPort());
+		bf.append("Source - "+source.getHost()+":"+this.source.getPort()+"\n");
 		if(uid != null)
-			bf.append("UID - "+this.transID);
-		if(readSet != null)
-		bf.append("ReadSet :: "+readSet);
-		if(writeSet != null)
-		bf.append("WriteSet :: "+writeSet);
+			bf.append("UID - "+this.transID+"\n");
+		if(readSet != null){
+			bf.append("ReadSet :: \n");
+			for(String str:  readSet.keySet())
+			{
+				bf.append("     "+str+","+ readSet.get(str)+"\n");
+			}
+		}
+		if(writeSet != null){
+			bf.append("WriteSet :: \n");
+			for(String str:  writeSet.keySet())
+			{
+				bf.append("     "+str+","+ writeSet.get(str)+"\n");
+			}
+		}
 		if(transaction != null)
 			bf.append("Transaction - "+transaction);
 		

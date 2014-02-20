@@ -48,9 +48,9 @@ public class ClientOpMsg extends MessageBase{
 			{
 				temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
 			}
-			bf.append(temp+"\n");
+			bf.append("   "+temp+"\n");
 		}
-		bf.append("\n Is ReadLock Acquired - "+this.isReadLock);
+		bf.append(" Is ReadLock Acquired - "+this.isReadLock);
 		bf.append("\n WriteSet :: \n");
 		for(ElementProto elementProto:  this.trans.getWriteSet().getElementsList())
 		{
@@ -59,7 +59,7 @@ public class ClientOpMsg extends MessageBase{
 			{
 				temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
 			}
-			bf.append(temp+"\n");
+			bf.append("   "+temp+"\n");
 		}
 		bf.append("\n");
 		

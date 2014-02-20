@@ -58,7 +58,7 @@ public class TransClient extends Node implements Runnable{
 		clientNode = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(port).build();
 		socket = context.socket(ZMQ.PULL);
 		//System.out.println(" Listening to "+Common.getLocalAddress(port));
-		socket.bind(Common.getLocalAddress(port));
+		socket.bind("tcp://*:"+port);
 		this.port = port;
 		String[] mds = Common.getProperty("mds").split(":");
 		if(mds[0].equalsIgnoreCase("localhost"))

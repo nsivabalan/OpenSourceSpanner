@@ -130,7 +130,7 @@ public class PaxosMsg extends MessageBase{
 		if(acceptNo != null)
 			bf.append("\b Accept Number - "+acceptNo);
 		if(acceptValue != null){
-			bf.append("\n Accept Value :: ");
+			bf.append("\n Accept Value :: \n");
 			for(ElementProto elementProto:  acceptValue.getElementsList())
 			{
 				String temp = elementProto.getRow()+":";
@@ -138,7 +138,7 @@ public class PaxosMsg extends MessageBase{
 				{
 					temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
 				}
-				bf.append(temp+"\n");
+				bf.append("     "+temp+"\n");
 			}
 		}
 		

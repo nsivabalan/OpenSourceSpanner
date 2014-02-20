@@ -34,8 +34,8 @@ public class UserClient extends Node implements Runnable{
 		InetAddress addr = InetAddress.getLocalHost();
 		clientNode = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(port).build();
 		socket = context.socket(ZMQ.PULL);
-		AddLogEntry(" Listening to "+Common.getLocalAddress(port));
-		socket.bind(Common.getLocalAddress(port));
+	//	AddLogEntry(" Listening to "+Common.getLocalAddress(port));
+		socket.bind("tcp://*:"+port);
 		this.port = port;
 		String[] transcli = Common.getProperty("transClient").split(":");
 		if(transcli[0].equalsIgnoreCase("localhost"))
