@@ -38,7 +38,7 @@ public class ClientOpMsg extends MessageBase{
 	public String toString() {
 		StringBuilder bf = new StringBuilder();
 		bf.append(this.getClass().getName() + " - " + this.msgType);
-		bf.append("\n Source - " + this.source.getHost()+" "+this.source.getPort());
+		bf.append("\n Source - " + this.source.getHost()+":"+this.source.getPort());
 		bf.append("\n UID - " + this.trans.getTransactionID());		
 		bf.append("\n ReadSet :: \n");
 		for(ElementProto elementProto:  this.trans.getReadSet().getElementsList())
