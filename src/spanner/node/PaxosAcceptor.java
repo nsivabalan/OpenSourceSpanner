@@ -105,12 +105,15 @@ public class PaxosAcceptor extends Node implements Runnable{
 			hostName = "127.0.0.1";
 		else
 			hostName = hostDetails[0];
-		socket.bind("tcp://"+hostName+":"+hostDetails[1]);
+		//AddLogEntry("Node Address :: "+hostName+":"+hostDetails[1]);
+		//System.out.println("addresss ::::: "+InetAddress.getLocalHost());
+//		socket.bind("tcp://"+hostName+":"+hostDetails[1]);
 		InetAddress addr = InetAddress.getLocalHost();
 		nodeAddress = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(Integer.parseInt(hostDetails[1])).build();
+		socket.bind("tcp://*:"+nodeAddress.getPort());
 		twoPhaseCoordinator = new TwoPC(shard, nodeAddress, context, isNew);
 		new Thread(twoPhaseCoordinator).start();
-
+		//AddLogEntry("local address " +InetAddress.getLocalHost().getHostAddress());
 		AddLogEntry("Participant node address "+nodeAddress.getHost()+":"+nodeAddress.getPort(), Level.FINE);
 		String[] mds = Common.getProperty("mds").split(":");
 		metadataService = NodeProto.newBuilder().setHost(mds[0]).setPort(Integer.parseInt(mds[1])).build();
@@ -744,7 +747,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	 */
 	private void sendMsgToMDS(NodeProto dest, PaxosDetailsMsg message)
 	{
-		this.AddLogEntry("Sent "+message, Level.INFO);
+		this.AddLogEntry("Sent "+message+" to "+dest.getHost()+":"+dest.getPort()+"\n", Level.INFO);
 		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
 		pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());

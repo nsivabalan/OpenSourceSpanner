@@ -38,10 +38,10 @@ public class MDService extends Node implements Runnable{
 		String[] mds = Common.getProperty("mds").split(":");
 		this.port = Integer.parseInt(mds[1]);
 		InetAddress addr = InetAddress.getLocalHost();
-		mdsNode = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(port).build();
+		mdsNode = NodeProto.newBuilder().setHost(mds[0]).setPort(port).build();
 		socket = context.socket(ZMQ.PULL);
-		System.out.println(" Listening to "+Common.getLocalAddress(port));
-		socket.bind(Common.getLocalAddress(port));
+		//System.out.println(" Listening to "+Common.getLocalAddress(port));
+		socket.bind("tcp://*:"+port);
 	//	createLogFiles();
 		metadataService = new MetaDS(isNew);
 
@@ -58,7 +58,7 @@ public class MDService extends Node implements Runnable{
 		System.out.println("Waiting for messages "+socket.toString());
 		while (!Thread.currentThread ().isInterrupted ()) {
 			String receivedMsg = new String( socket.recv(0)).trim();
-			//System.out.println("Received Messsage "+receivedMsg);
+			System.out.println("Received Messsage "+receivedMsg);
 			MessageWrapper msgwrap = MessageWrapper.getDeSerializedMessage(receivedMsg);
 			if (msgwrap != null)
 			{
@@ -157,7 +157,7 @@ public class MDService extends Node implements Runnable{
 	 */
 	private void SendPaxosDetailsMsg(NodeProto dest, PaxosDetailsMsg msg)
 	{
-		AddLogEntry("Sending Paxos Details Msg "+msg);
+		AddLogEntry("Sending Paxos Details Msg "+msg+" to "+dest.getHost()+":"+dest.getPort());
 		socketPush = context.socket(ZMQ.PUSH);
 		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 		//System.out.println(" "+socketPush.getLinger());
@@ -173,7 +173,7 @@ public class MDService extends Node implements Runnable{
 	 */
 	private void SendMetaData(NodeProto dest, MetaDataMsg msg)
 	{
-		AddLogEntry("Sending msg "+msg);
+		AddLogEntry("Sending msg "+msg+" to "+dest.getHost()+":"+dest.getPort());
 		socketPush = context.socket(ZMQ.PUSH);
 		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());

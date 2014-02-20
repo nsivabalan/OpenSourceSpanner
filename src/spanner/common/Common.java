@@ -36,8 +36,8 @@ public class Common {
 		else
 			osspanner_home = System.getProperty("user.dir");
 		
-		File filePath = new File(osspanner_home+"logs/spannerlogs/");
-		File paxosLog = new File(osspanner_home+"logs/paxoslog/");
+		File filePath = new File(osspanner_home+"/logs/spannerlogs/");
+		File paxosLog = new File(osspanner_home+"/logs/paxoslog/");
 		filePath.mkdirs();
 		paxosLog.mkdirs();
 	}
