@@ -101,29 +101,13 @@ public class PaxosAcceptor extends Node implements Runnable{
 		createLogFile(shard, nodeId, isNew);
 		//FIX ME
 		String hostName = null;
-		/*if(hostDetails[0].contains("127.0.0.1") || hostDetails[0].contains("localhost"))
-			hostName = "127.0.0.1";
-		else
-<<<<<<< HEAD
-			hostName = hostDetails[0];*/
+
 		socket.bind("tcp://*:"+hostDetails[1]);
-		InetAddress addr = InetAddress.getLocalHost();
-		//System.out.println("Address :"+addr.getHostAddress());
 		nodeAddress = NodeProto.newBuilder().setHost(hostDetails[0]).setPort(Integer.parseInt(hostDetails[1])).build();
-		System.out.println("Address :: "+nodeAddress.getHost()+":"+nodeAddress.getPort());
-=======
-			hostName = hostDetails[0];
-		//AddLogEntry("Node Address :: "+hostName+":"+hostDetails[1]);
-		//System.out.println("addresss ::::: "+InetAddress.getLocalHost());
-//		socket.bind("tcp://"+hostName+":"+hostDetails[1]);
-		InetAddress addr = InetAddress.getLocalHost();
-		nodeAddress = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(Integer.parseInt(hostDetails[1])).build();
-		socket.bind("tcp://*:"+nodeAddress.getPort());
->>>>>>> 28f8c4ec288f502a371c6f9b5b1a29314d23d3e5
 		twoPhaseCoordinator = new TwoPC(shard, nodeAddress, context, isNew);
 		new Thread(twoPhaseCoordinator).start();
 		//AddLogEntry("local address " +InetAddress.getLocalHost().getHostAddress());
-		AddLogEntry("Participant node address "+nodeAddress.getHost()+":"+nodeAddress.getPort(), Level.FINE);
+		AddLogEntry("Connected @ "+nodeAddress.getHost()+":"+nodeAddress.getPort(), Level.FINE);
 		String[] mds = Common.getProperty("mds").split(":");
 		metadataService = NodeProto.newBuilder().setHost(mds[0]).setPort(Integer.parseInt(mds[1])).build();
 		//FIX ME: check what needs to be passed in as constructor
@@ -188,14 +172,21 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private void createLogFile(String shard, String nodeId, boolean isClear) throws NumberFormatException, IOException
 	{
 		PAXOSLOG = new File(Common.PaxosLog+"/"+shard+"/"+nodeId+"_.log");
-		AddLogEntry("Creating log file "+PAXOSLOG.getAbsolutePath());
+		//AddLogEntry("Creating log file "+PAXOSLOG.getAbsolutePath());
 		if(PAXOSLOG.exists())
 		{
-			if(isClear)
-				new FileOutputStream(PAXOSLOG, false).close();			
+			if(isClear){				
+				new FileOutputStream(PAXOSLOG, false).close();
+				AddLogEntry("Clearing contents and creating new Log file "+PAXOSLOG.getAbsolutePath());
+			}
+			else{
+				AddLogEntry("Appending logs to already existing log file "+PAXOSLOG.getAbsolutePath());
+			}
 		}
-		else
+		else{
 			PAXOSLOG.createNewFile();
+			AddLogEntry("File does not exist. Hence creating new Log file "+PAXOSLOG.getAbsolutePath());
+		}
 	}
 
 
@@ -664,6 +655,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 
 	private void sendPaxosMsgRequestingAcceptors()
 	{
+		this.AddLogEntry("Sending msg to MDS reqeusting Acceptors", Level.INFO);
 		PaxosDetailsMsg msg = new PaxosDetailsMsg(nodeAddress, shard, PaxosDetailsMsgType.ACCEPTORS);
 		sendMsgToMDS(metadataService ,msg);
 	}
@@ -697,7 +689,14 @@ public class PaxosAcceptor extends Node implements Runnable{
 				acceptors.add(node);
 		}
 		acceptorsCount = acceptors.size();
-		AddLogEntry("List of Acceptors "+acceptors);
+		AddLogEntry("Received Metadata (Acceptors) response from MDS \n");
+		StringBuffer buffer = new StringBuffer();
+		buffer.append("==============================================================\n");
+		buffer.append("List of Acceptors : ");
+		for(NodeProto nodeProto : acceptors)
+			buffer.append(nodeProto.getHost()+":"+nodeProto.getPort()+", ");
+		buffer.append("\n==============================================================");
+		AddLogEntry(buffer.toString()+"\n");
 	}
 
 	/**
@@ -706,34 +705,34 @@ public class PaxosAcceptor extends Node implements Runnable{
 	 */
 	private synchronized void handlePaxosDetailsLeaderMsg(PaxosDetailsMsg msg)
 	{
-		this.AddLogEntry("Handling Leader info response from MDS");
+		AddLogEntry("Received Metadata (Leader) response from MDS \n");
 		leaderAddress = msg.getShardLeader();
 		if(leaderAddress != null)
 		{
-			this.AddLogEntry("Leader availabe "+leaderAddress.getHost()+":"+leaderAddress.getPort(), Level.INFO);
+			this.AddLogEntry("Leader availabe "+leaderAddress.getHost()+":"+leaderAddress.getPort()+"\n", Level.INFO);
 			int logPosition = getLastPaxosInstanceNumber();
 			logCounter = logPosition;
 			if(leaderAddress.equals(nodeAddress)){
 				isLeader= true;
 				this.state = PLeaderState.ACTIVE;
-				this.AddLogEntry("I am the leader as given by MDS" , Level.INFO);
+				this.AddLogEntry("I am the leader as given by MDS\n" , Level.INFO);
 			}
 			else{
 				if(!clearLog){
 					AddLogEntry("Last log position "+logPosition, Level.FINE);
-					this.AddLogEntry("Requesting replay log to Leader "+leaderAddress, Level.INFO);
+					this.AddLogEntry("Requesting replay log to Leader "+leaderAddress.getHost()+":"+leaderAddress.getPort()+"\n", Level.INFO);
 					requestReplayLog(logPosition, leaderAddress);
 				}
 				else{
 					this.state = PLeaderState.ACTIVE;
-					this.AddLogEntry("Starting logging from scratch", Level.INFO);
+					this.AddLogEntry("Starting logging from scratch\n", Level.INFO);
 				}
 			}
 		}
 		else{
 			if(waitingRequest != null)
 			{
-				this.AddLogEntry("Leader not set. Initiating Prepare phase for the waiting Request", Level.INFO);
+				this.AddLogEntry("Leader not set. Initiating Prepare phase for the waiting Request\n", Level.INFO);
 				if(waitingRequest.getMsgType() == ClientOPMsgType.READ)
 					initiatePreparePhase(waitingRequest.getTransaction().getTransactionID(), waitingRequest.getTransaction().getReadSet());
 				else
@@ -742,7 +741,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 			}
 			else{
 
-				this.AddLogEntry("Leader not set. No waiting Requests found. Initiaing Prepare phase with dummy values ", Level.INFO);
+				this.AddLogEntry("Leader not set. No waiting Requests found. Initiaing Prepare phase with dummy values\n", Level.INFO);
 				initiatePreparePhase("-1", null);
 			}
 		}
@@ -756,7 +755,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	 */
 	private void sendMsgToMDS(NodeProto dest, PaxosDetailsMsg message)
 	{
-		this.AddLogEntry("Sent "+message+" to "+dest.getHost()+":"+dest.getPort()+"\n", Level.INFO);
+		this.AddLogEntry("Sent :: "+message+"to "+dest.getHost()+":"+dest.getPort()+"\n", Level.INFO);
 		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
 		pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
@@ -771,7 +770,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	 */
 	private void sendMsgToMDS(NodeProto dest, LeaderMsg message)
 	{
-		this.AddLogEntry("Sent "+message, Level.INFO);
+		this.AddLogEntry("Sent :: "+message+"to "+dest.getHost()+":"+dest.getPort()+"\n", Level.INFO);
 		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
 		pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
@@ -814,7 +813,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	 */
 	private void sendPaxosMsg(NodeProto dest, PaxosMsg msg){
 		//System.out.println("Sent " + msg+" from "+nodeAddress.getHost()+":"+nodeAddress.getPort() +" to "+dest.getHost()+":"+dest.getPort()+"\n");
-		this.AddLogEntry("Sent "+msg+"\n");
+		//this.AddLogEntry("Sent "+msg+"\n");
 		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
 		pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());
@@ -898,7 +897,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 				pendingPaxosInstances.add(newLogPosition);
 				uidPaxosInstanceMap.put("P"+trans.getTransactionID(), paxInstance);
 				logPositionToPaxInstanceMap.put(newLogPosition, paxInstance);
-				AddLogEntry("Sending accept msgs to all acceptors ");
+				AddLogEntry("Sending accept msgs to all acceptors \n");
 				PaxosMsg message = new PaxosMsg(nodeAddress, "P"+trans.getTransactionID(),PaxosMsgType.ACCEPT, paxInstance.getBallotNumber(), trans.getWriteSet());
 				message.setLogPositionNumber(newLogPosition);
 				sendAcceptMsg(message);
@@ -928,6 +927,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		{
 			if(!node.equals(nodeAddress))
 			{
+				AddLogEntry("Sending ACCEPT message "+msg+"to "+node.getHost()+":"+node.getPort()+"\n");
 				sendPaxosMsg(node, msg);
 			}
 		}
@@ -1088,7 +1088,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private synchronized void handlePaxosAcceptMessage(PaxosMsg msg)
 	{
 		String uid = msg.getUID();
-		AddLogEntry("Handling ACCEPT msg for "+uid+" from :: "+msg.getSource().getHost()+":"+msg.getSource().getPort());
+		AddLogEntry("\nHandling ACCEPT msg "+msg);
 
 		if(logPostionToUIDMap.containsKey(msg.getLogPositionNumber()))
 		{	
@@ -1212,7 +1212,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 						lockTable.releaseReadLocks(uidTransMap.get(uid.substring(1)).trans.getReadSet(), uid.substring(1), true);
 					//FIX ME: send DECIDE msg to participants
 				}
-				AddLogEntry("Sending DECIDE to ALL ACCEPTORS after REACHING MAJORITY for a COMMIT transaction "+uid);
+				AddLogEntry("Sending DECIDE to ALL ACCEPTORS after REACHING MAJORITY for a COMMIT transaction "+uid+"\n");
 				PaxosMsg message = new PaxosMsg(nodeAddress, uid, PaxosMsgType.DECIDE, msg.getBallotNumber(), msg.getAcceptValue());
 				message.setLogPositionNumber(msg.getLogPositionNumber());
 				sendDecideMsg(message);
@@ -1227,16 +1227,16 @@ public class PaxosAcceptor extends Node implements Runnable{
 				///FIX me . send to TPC
 				writeToPaxLogFile(uidTologPositionMap.get(uid), "ABORTED", paxInstance.getAcceptedValue());
 				if(isLeader){
-					TransactionSource tempTransSource = uidTransMap.get(msg.getUID());
-					AddLogEntry("Sending client response(ABORT) to "+tempTransSource.getSource() +" for uid "+uid);
+					TransactionSource tempTransSource = uidTransMap.get(msg.getUID());					
 					lockTable.releaseLocksOfAborted(tempTransSource.trans);
 					TwoPCMsg message = new TwoPCMsg(nodeAddress, tempTransSource.getTrans(), TwoPCMsgType.ABORT, true);
+					AddLogEntry("Sending client response(ABORT)"+message+" to "+tempTransSource.getSource() );
 					SendTwoPCMessage(message, msg.getSource());
 				}
 			}
 		}
 		else if(uid.startsWith("P")){//Pax instance for PREPARE phase. Just obtained read locks
-			AddLogEntry("Sending DECIDE to ALL ACCEPTORS after REACHING MAJORITY for a PREPARE transaction "+uid);
+			AddLogEntry("Sending DECIDE to ALL ACCEPTORS after REACHING MAJORITY for a PREPARE transaction "+uid+"\n");
 			//FIX ME: send DECIDE msg to participants
 			writeToPaxLogFile(uidTologPositionMap.get(uid), "PREPARED", paxInstance.getAcceptedValue());
 			PaxosMsg message = new PaxosMsg(nodeAddress, uid, PaxosMsgType.DECIDE, msg.getBallotNumber(), msg.getAcceptValue());
@@ -1250,7 +1250,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		else if(uid.startsWith("A"))
 		{
 			//FIX ME: send DECIDE msg to participants
-			AddLogEntry("Sending DECIDE to ALL ACCEPTORS after REACHING MAJORITY for a ABORT transaction "+uid);
+			AddLogEntry("Sending DECIDE to ALL ACCEPTORS after REACHING MAJORITY for a ABORT transaction "+uid+"\n");
 			lockTable.releaseLocksOfAborted(uidTransMap.get(uid).trans);
 			PaxosMsg message = new PaxosMsg(nodeAddress, uid, PaxosMsgType.DECIDE, msg.getBallotNumber(), msg.getAcceptValue());
 			message.setLogPositionNumber(msg.getLogPositionNumber());
@@ -1269,7 +1269,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private synchronized void handlePaxosDecideMessage(PaxosMsg msg)
 	{
 		String uid = msg.getUID();
-		AddLogEntry("Handling DECIDE msg for "+uid+"  from :: "+msg.getSource().getHost()+":"+msg.getSource().getPort()+" for log position "+msg.getLogPositionNumber());
+		AddLogEntry("\nHandling DECIDE msg "+msg+"\n");
 		if(logPositionToPaxInstanceMap.containsKey(msg.getLogPositionNumber()))
 		{
 			PaxosInstance paxInstance = logPositionToPaxInstanceMap.get(msg.getLogPositionNumber());
@@ -1350,6 +1350,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		{
 			if(!node.equals(nodeAddress))
 			{
+				AddLogEntry("Sending DECIDE msg "+msg+" to "+node.getHost()+":"+node.getPort()+"\n");
 				sendPaxosMsg(node, msg);
 			}
 		}
@@ -1383,19 +1384,20 @@ public class PaxosAcceptor extends Node implements Runnable{
 		if(tempTransSource.getType() == TwoPCMsgType.PREPARE)
 		{	
 			TwoPCMsg message = new TwoPCMsg(nodeAddress, tempTransSource.getTrans(), TwoPCMsgType.PREPARE, true);
+			AddLogEntry("Sent PREPARE_ACK msg "+message+" to "+tempTransSource.getSource().getHost()+":"+tempTransSource.getSource().getPort());
 			SendTwoPCMessage(message, tempTransSource.getSource());
-			AddLogEntry("Sent Prepare Ack for UID - "+msg.getUID() +" to "+tempTransSource.getSource().getHost()+":"+tempTransSource.getSource().getPort());
+			
 		}
 		else if(tempTransSource.getType() == TwoPCMsgType.COMMIT){
 			TwoPCMsg message = new TwoPCMsg(nodeAddress, tempTransSource.getTrans(), TwoPCMsgType.COMMIT, true);
+			AddLogEntry("Sent COMMIT_ACK msg "+message+" to "+tempTransSource.getSource().getHost()+":"+tempTransSource.getSource().getPort());
 			SendTwoPCMessage(message, tempTransSource.getSource());
-			AddLogEntry("Sending Commit Ack for UID - "+msg.getUID() +" to "+tempTransSource.getSource().getHost()+":"+tempTransSource.getSource().getPort());
 		}
 
 		else if(tempTransSource.getType() == TwoPCMsgType.ABORT){
 			TwoPCMsg message = new TwoPCMsg(nodeAddress, tempTransSource.getTrans(), TwoPCMsgType.ABORT, true);
-			SendTwoPCMessage(message, tempTransSource.getSource());		
-			AddLogEntry("Sent Abort Ack for UID - "+msg.getUID() +" to "+tempTransSource.getSource().getHost()+":"+tempTransSource.getSource().getPort());
+			AddLogEntry("Sent ABORT msg "+message+" to "+tempTransSource.getSource().getHost()+":"+tempTransSource.getSource().getPort());
+			SendTwoPCMessage(message, tempTransSource.getSource());
 		}
 	}
 
@@ -1406,10 +1408,11 @@ public class PaxosAcceptor extends Node implements Runnable{
 	 */
 	private void handleTwoPCCommitMessage(TwoPCMsg msg)
 	{
+		AddLogEntry("Received TwoPC Commit Message "+msg);
 		if(isLeader)
 		{
 			TransactionProto trans = msg.getTransaction();
-			AddLogEntry("New commit trans from TPC :: "+msg);
+			//AddLogEntry("New commit trans from TPC :: "+msg);
 			boolean isWriteLock = true;
 			for(ElementProto element : trans.getWriteSet().getElementsList())
 			{
@@ -1458,6 +1461,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	 */
 	private synchronized void handleTwoPCAbortMessage(TwoPCMsg msg)
 	{
+		AddLogEntry("Received TwoPC Abort Message "+msg);
 		if(isLeader)
 		{	
 			TransactionProto trans = msg.getTransaction();
@@ -1505,7 +1509,6 @@ public class PaxosAcceptor extends Node implements Runnable{
 	 */
 	private void SendTwoPCMessage(TwoPCMsg message, NodeProto dest)
 	{
-		this.AddLogEntry("Sent "+message, Level.INFO);
 		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
 		pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
@@ -1547,7 +1550,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	public static void main(String args[]) throws IOException
 	{
 		if(args.length <= 2)
-			throw new IllegalArgumentException("Usage: PAcceptor <ShardID> <nodeId> T/F(clear log file or no)");
+			throw new IllegalArgumentException("Usage: PAcceptor <ShardID> <nodeId> true/false(clear log file or no)");
 		boolean isNew = Boolean.parseBoolean(args[2]);
 		PaxosAcceptor acceptor = new PaxosAcceptor(args[0], args[1], isNew);
 		new Thread(acceptor).start();

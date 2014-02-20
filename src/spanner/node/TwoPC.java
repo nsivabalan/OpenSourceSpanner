@@ -105,22 +105,24 @@ public class TwoPC extends Node implements Runnable{
 				TransactionStatus transStatus = uidTransactionStatusMap.get(uid);
 				if(curTime - transStatus.initTimeStamp > Common.TPC_TIMEOUT)
 				{	
-					System.out.println("Transaction timed out.");
+					//AddLogEntry("Transaction timed out "+uid+"\n");
 					if(uidTransTypeMap.get(uid) != TransactionType.ABORT)
 					{
-						System.out.println("Aborting the trans due to time out");
-						TwoPCMsg commit_response = new TwoPCMsg(nodeAddress, transStatus.trans, TwoPCMsgType.ABORT);
+						AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
+						AddLogEntry("Aborting the transaction "+uid+" due to time out");
+						TwoPCMsg response = new TwoPCMsg(nodeAddress, transStatus.trans, TwoPCMsgType.ABORT);
 						pendingTrans.remove(uid);
 						uidTransTypeMap.put(uid, TransactionType.ABORT);
 						transStatus.transState = TransactionType.ABORT;
 						uidTransactionStatusMap.put(uid, transStatus);
-						SendTwoPCMessage(commit_response, transStatus.source);
-						AddLogEntry("Sent Abort msg to Trans Client- "+uid, Level.INFO);
+						AddLogEntry("Sending Abort msg to Trans Client "+response, Level.INFO);
+						SendTwoPCMessage(response, transStatus.source);
 						for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
 						{
 							NodeProto dest = partitionServer.getPartitionServer().getHost();
 							sendAbortInitMessage(nodeAddress, dest, transStatus.trans, partitionServer.getElements());
 						}
+						AddLogEntry("*************************** End of TPC module ************************** ", Level.FINE);
 					}
 
 				}
@@ -137,12 +139,11 @@ public class TwoPC extends Node implements Runnable{
 		AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
 		NodeProto transClient= message.getSource();
 		TransactionProto trans = message.getTransaction();
-		AddLogEntry("TPC Received INFO msg from client &&&&& "+transClient.getHost()+":"+transClient.getPort(), Level.INFO);
+		AddLogEntry("Received INFO msg "+message+" from "+transClient.getHost()+":"+transClient.getPort()+"\n", Level.INFO);
 		TransactionStatus transStatus = new TransactionStatus(transClient, trans);
 		transStatus.initTimeStamp = System.currentTimeMillis();
-		AddLogEntry("Received Msg : "+message, Level.INFO);
 		uidTransactionStatusMap.put(trans.getTransactionID(), transStatus);
-		AddLogEntry("Waiting for prepare ack from participants " , Level.INFO);
+		AddLogEntry("Waiting for PREPARE_ACK from all participants\n" , Level.INFO);
 		uidTransTypeMap.put(trans.getTransactionID(), TransactionType.WRITEINIT);
 		pendingTrans.add(trans.getTransactionID());
 		AddLogEntry("*************************** End of TPC module ************************** ", Level.FINE);
@@ -154,7 +155,7 @@ public class TwoPC extends Node implements Runnable{
 		NodeProto transClient= message.getSource();
 		TransactionProto trans = message.getTransaction();
 		String uid = trans.getTransactionID();
-		AddLogEntry("Received Prepare msg "+message+" from participant "+transClient.getHost()+":"+transClient.getPort());
+		AddLogEntry("Received Prepare msg "+message+" from participant "+transClient.getHost()+":"+transClient.getPort()+"\n");
 		if(pendingTrans.contains(trans.getTransactionID()))
 		{
 			TransactionStatus transStatus = uidTransactionStatusMap.get(trans.getTransactionID());
@@ -176,13 +177,13 @@ public class TwoPC extends Node implements Runnable{
 
 			}
 			else{
-				AddLogEntry("Already aborted the transaction. No action taken");
+				AddLogEntry("Already aborted the transaction. No action taken\n");
 			}
 
 
 		}
 		else
-			AddLogEntry("Already decision taken on the transaction. No action taken for now");
+			AddLogEntry("Already decision taken on the transaction. No action taken for now\n");
 		AddLogEntry("*************************** End of TPC module ************************** ", Level.FINE);
 	}
 
@@ -196,15 +197,15 @@ public class TwoPC extends Node implements Runnable{
 		AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
 		NodeProto participant = message.getSource();
 		TransactionProto trans = message.getTransaction();
-		AddLogEntry("Received Commit message "+message +"from "+participant.getHost()+":"+participant.getPort());
+		AddLogEntry("Received Commit message "+message+"\n");
 		TransactionStatus transStatus = uidTransactionStatusMap.get(trans.getTransactionID());
 		String uid = trans.getTransactionID();
 		if(uidTransTypeMap.get(uid) != TransactionType.ABORT){
 			transStatus.paritcipantListCommit.add(participant);
 			uidTransactionStatusMap.put(trans.getTransactionID(), transStatus);
-			System.out.println("Expected Count "+transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementCount());
+			/*System.out.println("Expected Count "+transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementCount());
 			System.out.println("Actual Count "+transStatus.paritcipantListCommit.size());
-			System.out.println(" "+transStatus.paritcipantListCommit);
+			System.out.println(" "+transStatus.paritcipantListCommit);*/
 
 			if(transStatus.paritcipantListCommit.size() == transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementCount())
 			{
@@ -218,9 +219,14 @@ public class TwoPC extends Node implements Runnable{
 
 				pendingTrans.remove(trans.getTransactionID());
 				TwoPCMsg commit_response = new TwoPCMsg(nodeAddress, clientResponse, TwoPCMsgType.COMMIT);
-
+				AddLogEntry("Sending Commit msg "+commit_response+" to Transactional Client "+trans.getTransactionID());
 				SendTwoPCMessage(commit_response, transStatus.source);		
-				AddLogEntry("Sent Commit msg "+commit_response+" to Trans Client- "+trans.getTransactionID());
+			}
+			else{
+				StringBuffer buffer = new StringBuffer();
+				for(NodeProto nodeProto : transStatus.paritcipantListCommit)
+					buffer.append(nodeProto.getHost()+":"+nodeProto.getPort()+", ");
+				AddLogEntry("Yet to receive COMMIT ACKS from few more participants. List of received participants "+buffer.toString()+"\n");
 			}
 		}
 		else{
@@ -324,6 +330,7 @@ public class TwoPC extends Node implements Runnable{
 				.setWriteSet(elements)
 				.build();
 		TwoPCMsg msg = new TwoPCMsg(source, trans , TwoPCMsgType.ABORT);
+		AddLogEntry("Sending Abort Msg "+msg+" to participant "+dest.getHost()+":"+dest.getPort());
 		SendTwoPCMessage(msg, dest);
 		AddLogEntry("*************************** End of TPC module ************************** ", Level.FINE);
 	}
@@ -335,9 +342,6 @@ public class TwoPC extends Node implements Runnable{
 	 */
 	private void SendTwoPCMessage(TwoPCMsg message, NodeProto dest)
 	{
-		System.out.println("Sending TwoPCMsg " + message+" to "+dest.getHost()+":"+dest.getPort());
-		this.AddLogEntry("Sent "+message, Level.INFO);
-
 		ZMQ.Socket socket = context.socket(ZMQ.PUSH);
 		socket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());

@@ -34,31 +34,22 @@ public class MDService extends Node implements Runnable{
 	{
 		super(MDservice, isNew);
 		context = ZMQ.context(1);
-
 		String[] mds = Common.getProperty("mds").split(":");
 		this.port = Integer.parseInt(mds[1]);
 		InetAddress addr = InetAddress.getLocalHost();
 		mdsNode = NodeProto.newBuilder().setHost(mds[0]).setPort(port).build();
 		socket = context.socket(ZMQ.PULL);
-		//System.out.println(" Listening to "+Common.getLocalAddress(port));
 		socket.bind("tcp://*:"+port);
-	//	createLogFiles();
+		AddLogEntry("Listening to messages @ "+mdsNode.getHost()+":"+port+"\n");
 		metadataService = new MetaDS(isNew);
-
 	}
 	
 	
-	/*private void createLogFiles()
-	{
-		
-	}*/
-	
 	public void run()
 	{
-		System.out.println("Waiting for messages "+socket.toString());
 		while (!Thread.currentThread ().isInterrupted ()) {
 			String receivedMsg = new String( socket.recv(0)).trim();
-			System.out.println("Received Messsage "+receivedMsg);
+			//System.out.println("Received Messsage "+receivedMsg);
 			MessageWrapper msgwrap = MessageWrapper.getDeSerializedMessage(receivedMsg);
 			if (msgwrap != null)
 			{
@@ -119,6 +110,7 @@ public class MDService extends Node implements Runnable{
 	 */
 	private void ProcessRequestAcceptors(PaxosDetailsMsg msg)
 	{
+		AddLogEntry("Received Metadata Request (Acceptors) from "+msg.getSource().getHost()+":"+msg.getSource().getPort()+" for shard "+msg.getShardId()+"\n");
 		ArrayList<NodeProto> acceptors = metadataService.getAcceptors(msg.getShardId());
 		PaxosDetailsMsg message = new PaxosDetailsMsg(mdsNode, msg.getShardId(), PaxosDetailsMsgType.ACCEPTORS);
 		message.setReplicas(acceptors);
@@ -131,7 +123,7 @@ public class MDService extends Node implements Runnable{
 	 */
 	private void ProcessRequestLeader(PaxosDetailsMsg msg)
 	{
-		this.AddLogEntry(msg.getSource().getHost()+":"+msg.getSource().getPort()+" requesting Leader Address", Level.INFO);
+		AddLogEntry("Received Metadata Request (Leader) from "+msg.getSource().getHost()+":"+msg.getSource().getPort()+" for shard "+msg.getShardId()+"\n");
 		NodeProto shardLeader = metadataService.getShardLeader(msg.getShardId());
 		PaxosDetailsMsg message = new PaxosDetailsMsg(mdsNode, msg.getShardId(), PaxosDetailsMsgType.LEADER);
 		message.setShardLeader(shardLeader);
@@ -144,6 +136,7 @@ public class MDService extends Node implements Runnable{
 	 */
 	private void ProcessMetaDataMessage(MetaDataMsg msg)
 	{
+		AddLogEntry("Received MetaData request : "+msg);
 		TransactionMetaDataProto trans = metadataService.getTransactionDetails(msg.getSource(), msg.getReadSet(), msg.getWriteSet(), msg.getUID());
 		MetaDataMsg message = new MetaDataMsg(mdsNode, trans, MetaDataMsgType.RESPONSE);
 		
@@ -157,7 +150,7 @@ public class MDService extends Node implements Runnable{
 	 */
 	private void SendPaxosDetailsMsg(NodeProto dest, PaxosDetailsMsg msg)
 	{
-		AddLogEntry("Sending Paxos Details Msg "+msg+" to "+dest.getHost()+":"+dest.getPort());
+		AddLogEntry("Sending Paxos Details Msg "+msg+" to "+dest.getHost()+":"+dest.getPort()+"\n");
 		socketPush = context.socket(ZMQ.PUSH);
 		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 		//System.out.println(" "+socketPush.getLinger());
@@ -173,7 +166,7 @@ public class MDService extends Node implements Runnable{
 	 */
 	private void SendMetaData(NodeProto dest, MetaDataMsg msg)
 	{
-		AddLogEntry("Sending msg "+msg+" to "+dest.getHost()+":"+dest.getPort());
+		AddLogEntry("Sending msg "+msg+" to "+dest.getHost()+":"+dest.getPort()+"\n");
 		socketPush = context.socket(ZMQ.PUSH);
 		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());

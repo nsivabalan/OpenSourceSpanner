@@ -60,17 +60,21 @@ public class PaxosDetailsMsg extends MessageBase{
 	@Override
 	public String toString() {
 		StringBuffer bf = new StringBuffer();
-		bf.append("Source - "+source.getHost()+":"+this.source.getPort());
+		bf.append("\n============================================================== \n" +
+				"Source - "+source.getHost()+":"+this.source.getPort()+", ");
 		if(shardID != null)
-			bf.append("Shard ID - "+this.shardID);
+			bf.append("Shard ID - "+this.shardID+", ");
 		if(shardLeader != null)
-		bf.append("Shard Leader - "+shardLeader);
+			bf.append("Shard Leader - "+shardLeader.getHost()+":"+shardLeader.getPort()+" \n");
+		else
+			bf.append("\n");
 		if(replicas != null){
-		bf.append("Replicas - \n");
-		for(NodeProto node: replicas)
-			bf.append("   "+node.getHost()+":"+node.getPort()+"\n");
+			bf.append("Replicas ::");
+			for(NodeProto node: replicas)
+				bf.append(" "+node.getHost()+":"+node.getPort()+",");
+			bf.append("\n");
 		}
-		
+		bf.append("============================================================== \n");
 		return bf.toString();
 	}
 

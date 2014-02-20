@@ -118,9 +118,9 @@ public class PaxosMsg extends MessageBase{
 	@Override
 	public String toString() {
 		StringBuilder bf = new StringBuilder();
-		
-		bf.append(this.getClass().getName() + " - " + this.type);
-		bf.append("\nUID - "+this.uidstr);
+		bf.append("\n==============================================================");
+		bf.append("\n "+this.getClass().getName() + " - " + this.type);
+		bf.append("\n UID - "+this.uidstr);
 		bf.append("\n Source - " + this.source.getHost()+":"+this.source.getPort());
 		bf.append("\n MsgType - " + this.type);
 		if(logPositionNumber != -2)
@@ -141,7 +141,7 @@ public class PaxosMsg extends MessageBase{
 				bf.append("     "+temp+"\n");
 			}
 		}
-		
+		bf.append("============================================================== \n");
 		return bf.toString();
 	}
 	

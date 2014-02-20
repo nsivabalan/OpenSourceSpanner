@@ -47,17 +47,18 @@ public class TransClient extends Node implements Runnable{
 	ZMQ.Socket socket = null;
 	ZMQ.Socket socketPush = null;
 	NodeProto metadataService ;
-	NodeProto clientNode;
+	NodeProto transClient;
 	HashMap<String, NodeProto> clientMappings ;
 
 	public TransClient(String clientID, int port, boolean isNew) throws IOException
 	{
 		super(clientID, isNew);
 		context = ZMQ.context(1);
+		String[] tsClient = Common.getProperty("mds").split(":");
 		InetAddress addr = InetAddress.getLocalHost();
-		clientNode = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(port).build();
+		transClient = NodeProto.newBuilder().setHost(tsClient[0]).setPort(port).build();
 		socket = context.socket(ZMQ.PULL);
-		//System.out.println(" Listening to "+Common.getLocalAddress(port));
+		AddLogEntry("Listening to messages @ "+transClient.getHost()+":"+port);
 		socket.bind("tcp://*:"+port);
 		this.port = port;
 		String[] mds = Common.getProperty("mds").split(":");
@@ -97,10 +98,8 @@ public class TransClient extends Node implements Runnable{
 
 	public void run()
 	{
-		System.out.println("Waiting for messages "+socket.toString());
 		while (!Thread.currentThread ().isInterrupted ()) {
 			String receivedMsg = new String( socket.recv(0)).trim();
-			//System.out.println("Received Messsage "+receivedMsg);
 			MessageWrapper msgwrap = MessageWrapper.getDeSerializedMessage(receivedMsg);
 			if (msgwrap != null)
 			{
@@ -147,7 +146,7 @@ public class TransClient extends Node implements Runnable{
 		AddLogEntry("Handling Meta data request "+msg);
 		String uid = java.util.UUID.randomUUID().toString();
 		clientMappings.put(uid, msg.getSource());
-		MetaDataMsg message = new MetaDataMsg(clientNode, msg.getReadSet(), msg.getWriteSet(), MetaDataMsgType.REQEUST, uid);
+		MetaDataMsg message = new MetaDataMsg(transClient, msg.getReadSet(), msg.getWriteSet(), MetaDataMsgType.REQEUST, uid);
 		sendMetaDataMsg(message);
 	}
 
@@ -157,7 +156,7 @@ public class TransClient extends Node implements Runnable{
 	 */
 	private void sendMetaDataMsg(MetaDataMsg msg)
 	{
-		AddLogEntry("Sending Meta data request "+msg+" to "+metadataService.getHost()+":"+metadataService.getPort());
+		AddLogEntry("Sending Meta data request "+msg+" to MDService "+metadataService.getHost()+":"+metadataService.getPort());
 		socketPush = context.socket(ZMQ.PUSH);
 		socketPush.connect("tcp://"+metadataService.getHost()+":"+metadataService.getPort());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());
@@ -171,7 +170,7 @@ public class TransClient extends Node implements Runnable{
 	 */
 	private void handleMetaDataResponse(MetaDataMsg msg)
 	{
-		AddLogEntry("Handling meta data response "+msg);
+		AddLogEntry("\nHandling meta data response from MDS :: "+msg);
 		TransactionMetaDataProto transaction = msg.getTransaction();
 		TransactionProto trans = TransactionProto.newBuilder()
 				.setTransactionID(transaction.getTransactionID())
@@ -181,7 +180,6 @@ public class TransClient extends Node implements Runnable{
 				.setReadSetServerToRecordMappings(transaction.getReadSetServerToRecordMappings())
 				.setWriteSetServerToRecordMappings(transaction.getWriteSetServerToRecordMappings())
 				.build();
-		
 		
 		TransactionStatus transStatus = new TransactionStatus(trans);
 		transStatus.twoPC = transaction.getTwoPC();
@@ -225,7 +223,7 @@ public class TransClient extends Node implements Runnable{
 				.setReadSet(elements)
 				.build();
 
-		ClientOpMsg msg = new ClientOpMsg(clientNode, trans, ClientOPMsgType.READ);
+		ClientOpMsg msg = new ClientOpMsg(transClient, trans, ClientOPMsgType.READ);
 		SendClientOpMessage(msg, dest);
 	}
 
@@ -238,7 +236,7 @@ public class TransClient extends Node implements Runnable{
 		NodeProto source = message.getSource();
 		String uid = message.getTransaction().getTransactionID();
 		TransactionStatus transStatus = uidTransactionStatusMap.get(uid);
-		AddLogEntry("Msg received "+message);
+		AddLogEntry("Msg (Read Response) received "+message+"\n");
 
 		if(transStatus.state == TransactionType.ABORT)
 		{
@@ -248,7 +246,7 @@ public class TransClient extends Node implements Runnable{
 					.setTransactionStatus(TransactionStatusProto.ABORTED)
 					.setReadSet(message.getTransaction().getReadSet())
 					.build();
-			ClientOpMsg msg = new ClientOpMsg(clientNode, releaseResourceTrans, ClientOPMsgType.RELEASE_RESOURCE);
+			ClientOpMsg msg = new ClientOpMsg(transClient, releaseResourceTrans, ClientOPMsgType.RELEASE_RESOURCE);
 			SendClientOpMessage(msg, source);
 			return;
 		}
@@ -265,7 +263,7 @@ public class TransClient extends Node implements Runnable{
 					.setReadSet(transStatus.trans.getReadSet())
 					.build();
 			AddLogEntry("Sending Abort msg to user client");
-			ClientOpMsg msg = new ClientOpMsg(clientNode, transResponse, ClientOPMsgType.ABORT);
+			ClientOpMsg msg = new ClientOpMsg(transClient, transResponse, ClientOPMsgType.ABORT);
 			SendClientResponse(clientMappings.get(uid), msg);
 			return;
 		}
@@ -313,7 +311,7 @@ public class TransClient extends Node implements Runnable{
 							.setReadSet(transStatus.trans.getReadSet())
 							.build();
 
-					ClientOpMsg msg = new ClientOpMsg(clientNode, transResponse, ClientOPMsgType.COMMIT);
+					ClientOpMsg msg = new ClientOpMsg(transClient, transResponse, ClientOPMsgType.COMMIT);
 					AddLogEntry("Sending client response "+msg);
 					SendClientResponse(clientMappings.get(transResponse.getTransactionID()), msg);
 				}
@@ -361,8 +359,9 @@ public class TransClient extends Node implements Runnable{
 				.setTransactionStatus(TransactionStatusProto.ACTIVE)
 				.setWriteSet(elements)
 				.build();
-
+		
 		ClientOpMsg msg = new ClientOpMsg(source, trans , ClientOPMsgType.WRITE);
+		AddLogEntry("Sending Client Write Request "+msg+" to "+dest.getHost()+":"+dest.getPort()+"\n");
 		SendClientOpMessage(msg, dest);
 	}
 
@@ -381,8 +380,9 @@ public class TransClient extends Node implements Runnable{
 				.setReadSetServerToRecordMappings(transaction.getReadSetServerToRecordMappings())
 				.setWriteSetServerToRecordMappings(transaction.getWriteSetServerToRecordMappings())
 				.build();
-		AddLogEntry("Sending Trans Init msg to TPC RS :: "+transaction.getReadSet()+"\n WS :: "+transaction.getWriteSet());
-		TwoPCMsg msg = new TwoPCMsg(clientNode, trans, TwoPCMsgType.INFO);
+		
+		TwoPCMsg msg = new TwoPCMsg(transClient, trans, TwoPCMsgType.INFO);
+		AddLogEntry("Sending Transaction Init msg to TPC "+msg+"\n");
 		SendTwoPCInitMessage(msg, dest);
 	}
 
@@ -393,11 +393,8 @@ public class TransClient extends Node implements Runnable{
 	 */
 	private void SendTwoPCInitMessage(TwoPCMsg message, NodeProto dest)
 	{
-		AddLogEntry("Sending Client Request "+message);
 		socketPush = context.socket(ZMQ.PUSH);
-		System.out.println(" "+dest.getHost()+":"+dest.getPort());
 		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
-		System.out.println(" "+socketPush.getLinger());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
 		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
 		socketPush.close();
@@ -431,11 +428,12 @@ public class TransClient extends Node implements Runnable{
 				.setReadSet(msg.getTransaction().getReadSet())
 				.setWriteSet(msg.getTransaction().getWriteSet())
 				.build();*/
+		AddLogEntry("Received TwoPC Response : "+msg);
 		ClientOpMsg message = null;
 		if(msg.getMsgType() == TwoPCMsgType.COMMIT)
-			message = new ClientOpMsg(clientNode, msg.getTransaction(), ClientOPMsgType.COMMIT);
+			message = new ClientOpMsg(transClient, msg.getTransaction(), ClientOPMsgType.COMMIT);
 		else 
-			message = new ClientOpMsg(clientNode, msg.getTransaction(), ClientOPMsgType.ABORT);
+			message = new ClientOpMsg(transClient, msg.getTransaction(), ClientOPMsgType.ABORT);
 		SendClientResponse(clientMappings.get(msg.getTransaction().getTransactionID()), message);
 	}
 
@@ -453,7 +451,7 @@ public class TransClient extends Node implements Runnable{
 				.setReadSet(elements)
 				.build();
 
-		ClientOpMsg msg = new ClientOpMsg(clientNode, trans, ClientOPMsgType.UNLOCK);
+		ClientOpMsg msg = new ClientOpMsg(transClient, trans, ClientOPMsgType.UNLOCK);
 		SendClientOpMessage(msg, dest);
 	}
 
@@ -473,12 +471,9 @@ public class TransClient extends Node implements Runnable{
 	 * @param dest
 	 */
 	private void SendClientOpMessage(ClientOpMsg message, NodeProto dest)
-	{
-		AddLogEntry("Sending Client Response"+message);
+	{	
 		socketPush = context.socket(ZMQ.PUSH);
-		AddLogEntry("Destination :"+dest.getHost()+":"+dest.getPort()+"\n");
 		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
-		System.out.println(" "+socketPush.getLinger());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
 		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
 		socketPush.close();
@@ -491,10 +486,9 @@ public class TransClient extends Node implements Runnable{
 	 */
 	private void SendClientResponse(NodeProto dest,ClientOpMsg message)
 	{
-		AddLogEntry("Sending Client Response ::: "+message+"\n to "+dest);
+		AddLogEntry("Sending Client Response :: "+message+"to "+dest.getHost()+":"+dest.getPort()+"\n");
 		socketPush = context.socket(ZMQ.PUSH);
 		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
-		System.out.println(" "+socketPush.getLinger());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
 		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
 		socketPush.close();

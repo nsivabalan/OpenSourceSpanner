@@ -34,7 +34,7 @@ public class UserClient extends Node implements Runnable{
 		InetAddress addr = InetAddress.getLocalHost();
 		clientNode = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(port).build();
 		socket = context.socket(ZMQ.PULL);
-	//	AddLogEntry(" Listening to "+Common.getLocalAddress(port));
+		AddLogEntry("Listening to messages at "+Common.getLocalAddress(port));
 		socket.bind("tcp://*:"+port);
 		this.port = port;
 		String[] transcli = Common.getProperty("transClient").split(":");
@@ -48,7 +48,6 @@ public class UserClient extends Node implements Runnable{
 
 	public void run()
 	{
-		AddLogEntry("Waiting for messages "+socket.toString());
 		while (!Thread.currentThread ().isInterrupted ()) {
 			String receivedMsg = new String( socket.recv(0)).trim();
 			MessageWrapper msgwrap = MessageWrapper.getDeSerializedMessage(receivedMsg);
@@ -150,10 +149,9 @@ public class UserClient extends Node implements Runnable{
 	 */
 	private void sendMetaDataMsg(MetaDataMsg msg)
 	{
-		AddLogEntry("Sending Client Request "+msg);
+		AddLogEntry("Sending Client Request "+msg+"to "+transClient.getHost()+":"+transClient.getPort()+"\n");
 		socketPush = context.socket(ZMQ.PUSH);
 		socketPush.connect("tcp://"+transClient.getHost()+":"+transClient.getPort());
-		System.out.println(" "+socketPush.getLinger());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());
 		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
 		socketPush.close();
@@ -165,7 +163,7 @@ public class UserClient extends Node implements Runnable{
 	 */
 	private void ProcessClientResponse(ClientOpMsg msg)
 	{
-		AddLogEntry("Received Response "+msg);
+		AddLogEntry("Received Client Response "+msg);
 	}
 
 	public static void main(String[] args) throws IOException, ClassNotFoundException {

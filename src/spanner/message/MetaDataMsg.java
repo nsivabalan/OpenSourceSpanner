@@ -6,7 +6,9 @@ import java.util.HashMap;
 import spanner.common.Common.MetaDataMsgType;
 import spanner.protos.Protos.ColElementProto;
 import spanner.protos.Protos.ElementProto;
+import spanner.protos.Protos.ElementsSetProto;
 import spanner.protos.Protos.NodeProto;
+import spanner.protos.Protos.PartitionServerElementProto;
 import spanner.protos.Protos.TransactionMetaDataProto;
 import spanner.protos.Protos.TransactionProto;
 
@@ -76,9 +78,11 @@ public class MetaDataMsg extends MessageBase{
 	@Override
 	public String toString() {
 		StringBuffer bf = new StringBuffer();
-		bf.append("Source - "+source.getHost()+":"+this.source.getPort()+"\n");
+		bf.append("\n============================================================== \n" +
+				"Source - "+source.getHost()+":"+this.source.getPort()+", ");
 		if(uid != null)
-			bf.append("UID - "+this.transID+"\n");
+			bf.append("UID - "+this.transID);
+		bf.append("\n");
 		if(readSet != null){
 			bf.append("ReadSet :: \n");
 			for(String str:  readSet.keySet())
@@ -93,8 +97,90 @@ public class MetaDataMsg extends MessageBase{
 				bf.append("     "+str+","+ writeSet.get(str)+"\n");
 			}
 		}
-		if(transaction != null)
-			bf.append("Transaction - "+transaction);
+		if(transaction != null){
+			bf.append("Transaction - \n");
+			if(transaction.hasTransactionID())
+				bf.append(" Tnx ID : "+transaction.getTransactionID()+"\n");
+			if(transaction.hasHostNodeID())
+				bf.append(" HostID : "+transaction.getHostNodeID()+"\n");
+			if(transaction.hasTransactionStatus())
+				bf.append(" Transaction Status : "+transaction.getTransactionStatus()+"\n");
+			if(transaction.getReadSet() != null){
+				if(transaction.getReadSet().getElementsCount() > 0){
+				bf.append(" ReadSet :: \n");
+				ElementsSetProto acceptValue = transaction.getReadSet();
+				for(ElementProto elementProto:  acceptValue.getElementsList())
+				{
+					String temp = elementProto.getRow()+":";
+					for(ColElementProto colElemProto: elementProto.getColsList())
+					{
+						temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
+					}
+					bf.append("   "+temp+"\n");
+				}
+			}
+			}
+			if(transaction.getWriteSet() != null){
+				if(transaction.getWriteSet().getElementsCount() >0 ){
+				bf.append(" WriteSet :: \n");
+				ElementsSetProto acceptValue = transaction.getWriteSet();
+				for(ElementProto elementProto:  acceptValue.getElementsList())
+				{
+					String temp = elementProto.getRow()+":";
+					for(ColElementProto colElemProto: elementProto.getColsList())
+					{
+						temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
+					}
+					bf.append("   "+temp+"\n");
+				}
+			}
+			}
+			if(transaction.getReadSetServerToRecordMappings() != null)
+			{
+				if(transaction.getReadSetServerToRecordMappings().getPartitionServerElementCount() >0){
+				bf.append(" ReadSet Server Mappings :\n");
+				for(PartitionServerElementProto partitionServer : transaction.getReadSetServerToRecordMappings().getPartitionServerElementList())
+				{
+					NodeProto dest = partitionServer.getPartitionServer().getHost();
+					bf.append("   Server "+dest.getHost()+":"+dest.getPort()+" = ");
+					for(ElementProto elementProto:  partitionServer.getElements().getElementsList())
+					{
+						String temp = elementProto.getRow()+":";
+						for(ColElementProto colElemProto: elementProto.getColsList())
+						{
+							temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
+						}
+						bf.append("      "+temp+"::");
+					}
+					bf.append("\n");
+				}
+				}
+			}
+			if(transaction.getWriteSetServerToRecordMappings() != null)
+			{
+				if(transaction.getWriteSetServerToRecordMappings().getPartitionServerElementCount() > 0){
+				bf.append(" WriteSet Server Mappings :\n");
+				for(PartitionServerElementProto partitionServer : transaction.getWriteSetServerToRecordMappings().getPartitionServerElementList())
+				{
+					NodeProto dest = partitionServer.getPartitionServer().getHost();
+					bf.append("   Server "+dest.getHost()+":"+dest.getPort()+" = ");
+					for(ElementProto elementProto:  partitionServer.getElements().getElementsList())
+					{
+						String temp = elementProto.getRow()+":";
+						for(ColElementProto colElemProto: elementProto.getColsList())
+						{
+							temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
+						}
+						bf.append("      "+temp+"::");
+					}
+					bf.append("\n");
+				}
+				}
+			}
+			if(transaction.hasTwoPC())
+				bf.append(" TwoPC : "+transaction.getTwoPC().getHost()+":"+transaction.getTwoPC().getPort());
+		}
+		bf.append("\n============================================================== \n");
 		
 		return bf.toString();
 	}

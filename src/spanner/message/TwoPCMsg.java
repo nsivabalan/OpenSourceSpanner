@@ -21,14 +21,14 @@ public class TwoPCMsg extends MessageBase{
 	private TransactionProto trans;
 	private TwoPCMsgType type;
 	private boolean toTPC;
-	
+
 	public TwoPCMsg(NodeProto source, TransactionProto trans, TwoPCMsgType type )
 	{
 		this.source = source;
 		this.trans = trans;
 		this.type = type;
 	}
-	
+
 	public TwoPCMsg(NodeProto source, TransactionProto trans, TwoPCMsgType type, boolean toTPC )
 	{
 		this.source = source;
@@ -36,61 +36,62 @@ public class TwoPCMsg extends MessageBase{
 		this.type = type;
 		this.toTPC = toTPC;
 	}
-	
+
 	public boolean isTwoPC()
 	{
 		return this.toTPC;
 	}
-	
+
 	public NodeProto getSource()
 	{
 		return this.source;
 	}
-	
+
 	public TransactionProto getTransaction()
 	{
 		return this.trans;
 	}
-	
+
 	public TwoPCMsgType getMsgType()
 	{
 		return this.type;
 	}
-	
+
 	@Override
 	public String toString() {
 		StringBuilder bf = new StringBuilder();
-		
-		bf.append("\n"+this.getClass().getName() + " - " + this.type);
+		bf.append("\n==============================================================");
+		bf.append("\n "+this.getClass().getName() + " - " + this.type);
 		bf.append("\n Source - " + this.source.getHost()+":"+this.source.getPort());
 		bf.append("\n UID - " + this.trans.getTransactionID());
-		bf.append("\n ReadSet :: \n");
-		for(ElementProto elementProto:  this.trans.getReadSet().getElementsList())
-		{
-			String temp = elementProto.getRow()+":";
-			for(ColElementProto colElemProto: elementProto.getColsList())
+		if(trans.getReadSet().getElementsCount() > 0){
+			bf.append("\n ReadSet :: \n");
+			for(ElementProto elementProto:  this.trans.getReadSet().getElementsList())
 			{
-				temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
+				String temp = elementProto.getRow()+":";
+				for(ColElementProto colElemProto: elementProto.getColsList())
+				{
+					temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
+				}
+				bf.append("  "+temp+"\n");
 			}
-			bf.append(temp+"\n");
 		}
-		
-		bf.append("\n WriteSet :: \n");
-		for(ElementProto elementProto:  this.trans.getWriteSet().getElementsList())
-		{
-			String temp = elementProto.getRow()+":";
-			for(ColElementProto colElemProto: elementProto.getColsList())
+		if(trans.getWriteSet().getElementsCount() > 0){
+			bf.append("\n WriteSet :: \n");
+			for(ElementProto elementProto:  this.trans.getWriteSet().getElementsList())
 			{
-				temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
+				String temp = elementProto.getRow()+":";
+				for(ColElementProto colElemProto: elementProto.getColsList())
+				{
+					temp += colElemProto.getCol()+","+colElemProto.getValue()+";";
+				}
+				bf.append("  "+temp+"\n");
 			}
-			bf.append(temp+"\n");
 		}
-		
-		bf.append("\n");
-		
+		bf.append("============================================================== \n");
 		return bf.toString();
 	}
-	
-	
+
+
 
 }

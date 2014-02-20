@@ -222,7 +222,7 @@ public class MetaDS extends Node{
 				count++;
 
 			}
-			AddLogEntry("TPC chosen "+twoPC);
+		//	AddLogEntry("TPC chosen "+twoPC);
 			TransactionMetaDataProto transaction = TransactionMetaDataProto.newBuilder()
 					.setTransactionID(uid)
 					.setTransactionStatus(TransactionMetaDataProto.TransactionStatusProto.ACTIVE)
