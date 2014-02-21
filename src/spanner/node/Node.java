@@ -1,6 +1,7 @@
 package spanner.node;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -29,15 +30,43 @@ public class Node {
 		//Logging Specific
 		
 		logFile = new File(Common.FilePath+"/"+this.nodeId+".log");
-		if(isNew)
-			new FileOutputStream(logFile, false).close();
-		
+		createLogFile(logFile, isNew);
 		logFileHandler = new FileHandler(Common.FilePath+"/"+this.nodeId+".log", true);
 		logFileHandler.setFormatter(new SimpleFormatter());
+
 		LOGGER.setLevel(Level.INFO); //Sets the default level if not provided.		
 		LOGGER.addHandler(logFileHandler);
 		LOGGER.setUseParentHandlers(false);
 	}	
+
+	/**
+	 * 
+	 * @param isNew
+	 */
+	private void createLogFile(File logFile, boolean isNew)
+	{
+		
+		try {
+			File logDir = new File(Common.FilePath);
+			if(!logDir.exists())
+				logDir.mkdirs();
+			if(logFile.exists())
+			{
+				if(isNew){		
+					new FileOutputStream(logFile, false).close();
+					AddLogEntry("Clearing contents and creating new Log file "+logFile.getAbsolutePath());
+				}
+				else
+					AddLogEntry("Appending logs to already existing log file "+logFile.getAbsolutePath());				
+			}
+			else{
+				logFile.createNewFile();
+				AddLogEntry("File does not exist. Hence creating new Log file "+logFile.getAbsolutePath());
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 
 	/**
 	 * Method to append content to Log with custom Log Level
@@ -57,5 +86,5 @@ public class Node {
 		AddLogEntry(message, Level.INFO);		
 	}
 
-	
+
 }

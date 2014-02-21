@@ -171,8 +171,10 @@ public class PaxosAcceptor extends Node implements Runnable{
 	 */
 	private void createLogFile(String shard, String nodeId, boolean isClear) throws NumberFormatException, IOException
 	{
-		PAXOSLOG = new File(Common.PaxosLog+"/"+shard+"/"+nodeId+"_.log");
-		//AddLogEntry("Creating log file "+PAXOSLOG.getAbsolutePath());
+		File paxosDir = new File(Common.PaxosLog);
+		if(!paxosDir.exists())
+			paxosDir.mkdirs();
+		PAXOSLOG = new File(Common.PaxosLog+"/"+nodeId+"_.log");
 		if(PAXOSLOG.exists())
 		{
 			if(isClear){				

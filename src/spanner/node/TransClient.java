@@ -288,6 +288,12 @@ public class TransClient extends Node implements Runnable{
 			uidTransactionStatusMap.put(uid, transStatus);
 			if(transStatus.noOfReadLocks == transStatus.readLocks.size())
 			{
+				try {
+					Thread.sleep(2000);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 				transStatus.isReadLockAcquired = true;
 				uidTransactionStatusMap.put(uid, transStatus);
 				if(transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementCount() != 0){
@@ -328,14 +334,14 @@ public class TransClient extends Node implements Runnable{
 	private void initiateWritePhase(TransactionProto trans, NodeProto twoPC)
 	{
 		sendTwoPCInitMessagetoTPC( twoPC, trans);
-		/*try {
-			System.out.println("Sleeping for 5 secs ::: ");
-			Thread.sleep(5000);
+		try {
+			System.out.println("Sleeping for 2 secs ::: ");
+			Thread.sleep(2000);
 			System.out.println("Woke up from sleep. Initiating TPC among all participants");
 		} catch (InterruptedException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
-		}*/
+		}
 
 		for(PartitionServerElementProto partitionServer : trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
 		{

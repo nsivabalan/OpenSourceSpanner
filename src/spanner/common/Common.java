@@ -43,8 +43,8 @@ public class Common {
 	}
 	
 	
-	public static String FilePath = osspanner_home+"logs/spannerlogs";
-	public static String PaxosLog = osspanner_home+"logs/paxoslog/";
+	public static String FilePath = osspanner_home+"/logs/spannerlogs";
+	public static String PaxosLog = osspanner_home+"/logs/paxoslog/";
 	
 	public static String tableName = "default_Table";
 	

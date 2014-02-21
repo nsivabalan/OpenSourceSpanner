@@ -149,6 +149,11 @@ public class TwoPC extends Node implements Runnable{
 		AddLogEntry("*************************** End of TPC module ************************** ", Level.FINE);
 	}
 
+	/**
+	 * Method used to process incoming PREPARE message for a two phase commit
+	 * @param message
+	 * @throws IOException
+	 */
 	public synchronized void ProcessPrepareMessage(TwoPCMsg message) throws IOException
 	{
 		AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
