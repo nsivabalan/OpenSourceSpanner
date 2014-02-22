@@ -68,8 +68,6 @@ public class PaxosAcceptor extends Node implements Runnable{
 	LockTable lockTable = null;
 	private static boolean clearLog ;
 	private static File PAXOSLOG = null;
-	private static FileWriter paxosLogWriter = null;
-	private static BufferedWriter bufferedWriter = null;
 	int acceptorsCount = 0;
 	BallotNumber ballotNo = null;
 	private HashMap<String, Integer> uidTologPositionMap = null; 
@@ -111,7 +109,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		String[] mds = Common.getProperty("mds").split(":");
 		metadataService = NodeProto.newBuilder().setHost(mds[0]).setPort(Integer.parseInt(mds[1])).build();
 		//FIX ME: check what needs to be passed in as constructor
-		lockTable = new LockTable("");
+		lockTable = new LockTable(nodeId, isNew);
 		pendingPaxosInstances = new HashSet<Integer>();
 		uidTransMap = new HashMap<String, TransactionSource>();
 		localResource = new ResourceHM(this.LOGGER);

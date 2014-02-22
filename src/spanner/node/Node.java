@@ -40,12 +40,11 @@ public class Node {
 	}	
 
 	/**
-	 * 
+	 * Method to install log files
 	 * @param isNew
 	 */
 	private void createLogFile(File logFile, boolean isNew)
 	{
-		
 		try {
 			File logDir = new File(Common.FilePath);
 			if(!logDir.exists())

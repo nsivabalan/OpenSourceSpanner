@@ -1,7 +1,16 @@
 package spanner.locks;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Hashtable;
 
+import spanner.common.Common;
+import spanner.protos.Protos.ColElementProto;
 import spanner.protos.Protos.ElementProto;
 import spanner.protos.Protos.ElementsSetProto;
 import spanner.protos.Protos.TransactionProto;
@@ -10,6 +19,7 @@ import spanner.protos.Protos.TransactionProto;
 public class LockTable {
 
 	public static String initial;
+	private static File LOCKLOG;
 
 	public static Hashtable<String, LockHolders> lockTable;
 	public static String lockTableLock;
@@ -21,10 +31,40 @@ public class LockTable {
 		this.initial = initial;
 	}
 
-	public synchronized static boolean getReadLock (String element, String transactionId) {
+	public LockTable(String nodeId, boolean isNew)
+	{
+		this("");
+		createLogFile(nodeId, isNew);
+	}
+
+	private void createLogFile(String nodeId, boolean isClear) 
+	{
+		File lockDir = new File(Common.LockFile);
+		try {
+			if(!lockDir.exists())
+				lockDir.mkdirs();
+			LOCKLOG = new File(Common.LockFile+"/"+nodeId+"_.log");
+			if(LOCKLOG.exists())
+			{
+				if(isClear){	
+					new FileOutputStream(LOCKLOG, false).close();
+				}
+				else{
+				}
+			}
+			else{
+				LOCKLOG.createNewFile();
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public synchronized boolean getReadLock (String element, String transactionId) {
 
 		if ( !initial.equals("") ) {
 			if (element.charAt(0)!=initial.charAt(0)) {
+				writeToLockLogFile("READ_LOCK", true, transactionId, element);
 				return true;
 			}
 		}
@@ -39,7 +79,7 @@ public class LockTable {
 			LockHolders newLockHolder = new LockHolders(element);
 			newLockHolder.getReadLockHolders().add(new Lock(transactionId, System.currentTimeMillis()));
 			lockTable.put(element, newLockHolder);
-
+			writeToLockLogFile("READ_LOCK", true, transactionId, element);
 			return true; // successful
 
 		} else {
@@ -49,7 +89,7 @@ public class LockTable {
 				lockHolder.getReadLockHolders().add(new Lock(transactionId, System.currentTimeMillis()));
 
 				lockTable.put(element, lockHolder);
-
+				writeToLockLogFile("READ_LOCK", true, transactionId, element);
 				return true; // successful
 			} else {
 
@@ -60,10 +100,11 @@ public class LockTable {
 					lockHolder.getReadLockHolders().add(new Lock(transactionId, System.currentTimeMillis()));
 
 					lockTable.put(element, lockHolder);
-
+					writeToLockLogFile("READ_LOCK", true, transactionId, element);
 					return true; // successful
 
 				} else {
+					writeToLockLogFile("READ_LOCK", false, transactionId, element);
 					return false; // fail
 				}
 			}
@@ -72,10 +113,11 @@ public class LockTable {
 
 	}
 
-	public synchronized static boolean getWriteLock (String element, String transactionId) {
+	public synchronized boolean getWriteLock (String element, String transactionId) {
 
 		if ( !initial.equals("") ) {
 			if (element.charAt(0)!=initial.charAt(0)) {
+				writeToLockLogFile("WRITE_LOCK", true, transactionId, element);
 				return true;
 			}
 		}
@@ -88,7 +130,7 @@ public class LockTable {
 			LockHolders newLockHolder = new LockHolders(element);
 			newLockHolder.setWriteLockHolder(new Lock(transactionId, System.currentTimeMillis()));
 			lockTable.put(element, newLockHolder);
-
+			writeToLockLogFile("WRITE_LOCK", true, transactionId, element);
 			return true; // successful
 
 		} else {
@@ -99,6 +141,7 @@ public class LockTable {
 				lockHolder.setWriteLockHolder(new Lock(transactionId, System.currentTimeMillis()));
 				lockHolder.getReadLockHolders().clear();
 				lockTable.put(element, lockHolder);
+				writeToLockLogFile("WRITE_LOCK", true, transactionId, element);
 				return true;
 			} else {
 				return false;
@@ -109,10 +152,11 @@ public class LockTable {
 
 	}
 
-	public synchronized static void releaseReadLock (String element, String transactionId, boolean committed) {
+	public synchronized void releaseReadLock (String element, String transactionId, boolean committed) {
 
 		if ( !initial.equals("") ) {
 			if (element.charAt(0)!=initial.charAt(0)) {
+				writeToLockLogFile("RELEASE_READ_LOCK", transactionId, element);
 				return;
 			}
 		}
@@ -124,19 +168,23 @@ public class LockTable {
 		}
 
 		boolean containsTheElement = lockHolder.getReadLockHolders().remove(new Lock(transactionId, System.currentTimeMillis()));
-
+		
 		lockTable.put(element, lockHolder);
-
+		
 		if (!containsTheElement) {
 			if (committed) throw new RuntimeException("releasing a non existing lock "+element);
+		}
+		else{
+			writeToLockLogFile("RELEASE_READ_LOCK", transactionId, element);
 		}
 
 	}
 
-	public synchronized static void releaseWriteLock (String element, String transactionId, boolean committed) {
+	public synchronized void releaseWriteLock (String element, String transactionId, boolean committed) {
 
 		if ( !initial.equals("") ) {
 			if (element.charAt(0)!=initial.charAt(0)) {
+				writeToLockLogFile("RELEASE_WRITE_LOCK", transactionId, element);
 				return;
 			}
 		}
@@ -154,10 +202,10 @@ public class LockTable {
 		lockHolder.setWriteLockHolder(null);
 
 		lockTable.put(element, lockHolder);
-
+		writeToLockLogFile("RELEASE_WRITE_LOCK", transactionId, element);
 	}
 
-	public synchronized static boolean isReadLockAcquired (String element, String transactionId) {
+	public synchronized boolean isReadLockAcquired (String element, String transactionId) {
 
 		if ( !initial.equals("") ) {
 			if (element.charAt(0)!=initial.charAt(0)) {
@@ -181,21 +229,21 @@ public class LockTable {
 
 	}
 
-	public synchronized static void releaseReadLocks (ElementsSetProto readSet, String uid, boolean isCommited) {
+	public synchronized void releaseReadLocks (ElementsSetProto readSet, String uid, boolean isCommited) {
 
 		for (ElementProto element : readSet.getElementsList()) {
 			releaseReadLock(element.getRow(), uid, isCommited);
 		}
-		
+
 	}
-	
-	public synchronized static void releaseLocks(TransactionProto trans)
+
+	public synchronized void releaseLocks(TransactionProto trans)
 	{
 		releaseReadLocks(trans.getReadSet(), trans.getTransactionID(), true);
 		releaseWriteLocks(trans.getWriteSet(), trans.getTransactionID(), true);
 	}
 
-	public synchronized static void releaseWriteLocks (ElementsSetProto writeSet, String uid, boolean isCommited) {
+	public synchronized void releaseWriteLocks (ElementsSetProto writeSet, String uid, boolean isCommited) {
 
 		for (ElementProto element : writeSet.getElementsList()) {
 			releaseWriteLock(element.getRow(), uid, isCommited);
@@ -203,13 +251,54 @@ public class LockTable {
 
 	}
 
-	public synchronized static void releaseLocksOfAborted (TransactionProto trans) {
+	public synchronized void releaseLocksOfAborted (TransactionProto trans) {
 
 		releaseReadLocks(trans.getReadSet(), trans.getTransactionID(), false);
 		releaseWriteLocks(trans.getWriteSet(), trans.getTransactionID(), false);
 
 	}
-
-
-
+	
+	/**
+	 * Method used to append content to Log file for Locks
+	 * @param counter
+	 * @param type
+	 * @param acceptedValue
+	 */
+	private void writeToLockLogFile(String type, boolean isAccepted, String transId, String element)
+	{
+		StringBuffer buffer = new StringBuffer();
+		System.out.println(type+" "+isAccepted+" "+transId+" "+element);
+		if(isAccepted)
+			buffer.append(System.currentTimeMillis()+": "+element+" = "+type+" acquired by "+transId);
+		else
+			buffer.append(System.currentTimeMillis()+": "+element+" = "+type+" rejected for "+transId);
+		try {
+			PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(LOCKLOG, true)));
+			out.println(buffer.toString());
+			out.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	
+	/**
+	 * Method used to append content to Log file for Locks
+	 * @param counter
+	 * @param type
+	 * @param acceptedValue
+	 */
+	private void writeToLockLogFile(String type, String transId, String element)
+	{
+		StringBuffer buffer = new StringBuffer();
+		System.out.println(type+" "+transId+" "+element);
+		buffer.append(System.currentTimeMillis()+": "+element+" = "+type+" by "+transId);
+		try {
+			PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(LOCKLOG, true)));
+			out.println(buffer.toString());
+			out.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 }

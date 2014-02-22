@@ -289,7 +289,7 @@ public class TransClient extends Node implements Runnable{
 			if(transStatus.noOfReadLocks == transStatus.readLocks.size())
 			{
 				try {
-					Thread.sleep(2000);
+					Thread.sleep(4000);
 				} catch (InterruptedException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();

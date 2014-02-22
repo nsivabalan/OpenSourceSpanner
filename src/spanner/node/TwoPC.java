@@ -171,6 +171,12 @@ public class TwoPC extends Node implements Runnable{
 					AddLogEntry("Received Prepare msg from all participants. Initiating COMMIT phase");
 					for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
 					{
+						try {
+							Thread.sleep(2000);
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
 						uidTransTypeMap.put(trans.getTransactionID(), TransactionType.COMMIT);
 						transStatus.initTimeStamp = System.currentTimeMillis();
 						transStatus.transState = TransactionType.COMMIT;
