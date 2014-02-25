@@ -84,6 +84,7 @@ public class TransClient extends Node implements Runnable{
 		Long initTimeStamp = null;
 		TransactionProto trans;
 		boolean isReadLockAcquired ;
+		boolean isClientResponseSent ;
 		NodeProto twoPC ;
 
 		public TransactionStatus(TransactionProto trans)
@@ -102,7 +103,7 @@ public class TransClient extends Node implements Runnable{
 					readLocks.put(node.getPartitionServer().getHost(), false);
 				}
 			}
-			
+
 		}		
 	}
 
@@ -149,7 +150,7 @@ public class TransClient extends Node implements Runnable{
 		context.term();
 	}
 
-	
+
 	public void executeDaemon()
 	{
 		while(true){
@@ -178,7 +179,7 @@ public class TransClient extends Node implements Runnable{
 				if(curTime - transStatus.initTimeStamp > Common.TRANS_CLIENT_TIMEOUT)
 				{	
 					//AddLogEntry("Transaction timed out "+uid+"\n");
-					if(uidTransTypeMap.get(uid) != TransactionType.ABORT)
+					if(uidTransTypeMap.get(uid) != TransactionType.ABORT && !transStatus.isClientResponseSent)
 					{
 						//AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
 						AddLogEntry("Aborting the transaction "+uid+" due to time out");
@@ -186,6 +187,7 @@ public class TransClient extends Node implements Runnable{
 						//TwoPCMsg response = new TwoPCMsg(transClient, transStatus.trans, TwoPCMsgType.ABORT);
 						pendingTransList.remove(uid);
 						uidTransTypeMap.put(uid, TransactionType.ABORT);
+						transStatus.isClientResponseSent = true;
 						uidTransactionStatusMap.put(uid, transStatus);
 						AddLogEntry("Sending Abort msg to Trans Client "+response, Level.INFO);
 						SendClientResponse(clientMappings.get(uid), response);
@@ -523,19 +525,21 @@ public class TransClient extends Node implements Runnable{
 		AddLogEntry("Received TwoPC Response : "+msg);
 		String uid = msg.getTransaction().getTransactionID();
 		pendingTransList.remove(msg.getTransaction().getTransactionID());
-		
-		ClientOpMsg message = null;
-		if(msg.getMsgType() == TwoPCMsgType.COMMIT){
-			message = new ClientOpMsg(transClient, msg.getTransaction(), ClientOPMsgType.COMMIT);
-			uidTransTypeMap.put(uid, TransactionType.COMMIT);
-			releaseLocks(uidTransactionStatusMap.get(uid), true);
+		TransactionStatus transStatus = uidTransactionStatusMap.get(uid);
+		if(!transStatus.isClientResponseSent){
+			ClientOpMsg message = null;
+			if(msg.getMsgType() == TwoPCMsgType.COMMIT){
+				message = new ClientOpMsg(transClient, msg.getTransaction(), ClientOPMsgType.COMMIT);
+				uidTransTypeMap.put(uid, TransactionType.COMMIT);
+				releaseLocks(transStatus, true);
+			}
+			else{ 
+				message = new ClientOpMsg(transClient, msg.getTransaction(), ClientOPMsgType.ABORT);
+				uidTransTypeMap.put(uid, TransactionType.ABORT);
+				releaseLocks(transStatus, false);
+			}
+			SendClientResponse(clientMappings.get(msg.getTransaction().getTransactionID()), message);
 		}
-		else{ 
-			message = new ClientOpMsg(transClient, msg.getTransaction(), ClientOPMsgType.ABORT);
-			uidTransTypeMap.put(uid, TransactionType.ABORT);
-			releaseLocks(uidTransactionStatusMap.get(uid), false);
-		}
-		SendClientResponse(clientMappings.get(msg.getTransaction().getTransactionID()), message);
 	}
 
 	/**
