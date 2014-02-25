@@ -1,5 +1,5 @@
-mkdir temp
-cd temp
+mkdir ~/temp
+cd ~/temp
 cp ../lib/zeromq-3.2.3.tar.gz
 tar xvzf zeromq-3.2.3.tar.gz
 cd zeromq-3.2.3
