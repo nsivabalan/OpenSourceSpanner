@@ -229,6 +229,16 @@ public class TwoPC extends Node implements Runnable{
 						.build();
 
 				pendingTrans.remove(trans.getTransactionID());
+				//FIX ME: release read set for the trans
+				
+				for(PartitionServerElementProto partitionServer : transStatus.trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
+				{
+					NodeProto dest = partitionServer.getPartitionServer().getHost();
+					if(!dest.equals(participant)){
+						releaseReadSet(nodeAddress, dest, trans, partitionServer.getElements());
+					}
+				}
+				
 				TwoPCMsg commit_response = new TwoPCMsg(nodeAddress, clientResponse, TwoPCMsgType.COMMIT);
 				AddLogEntry("Sending Commit msg "+commit_response+" to Transactional Client "+trans.getTransactionID());
 				SendTwoPCMessage(commit_response, transStatus.source);		
@@ -275,15 +285,24 @@ public class TwoPC extends Node implements Runnable{
 			for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
 			{
 				NodeProto dest = partitionServer.getPartitionServer().getHost();
-				if(!dest.equals(participant))
+				if(!dest.equals(participant)){
 					sendAbortInitMessage(nodeAddress, dest, trans, partitionServer.getElements());
+				}
+			}
+			
+			for(PartitionServerElementProto partitionServer : transStatus.trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
+			{
+				NodeProto dest = partitionServer.getPartitionServer().getHost();
+				if(!dest.equals(participant)){
+					releaseReadSet(nodeAddress, dest, trans, partitionServer.getElements());
+				}
 			}
 		}
 		else{
 			transStatus.paritcipantListAbort.add(participant);
 			AddLogEntry("Abort initiated already for the transaction. Updating the Abort Acks");
-			AddLogEntry("Expected Count "+transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementCount()+"\n", Level.FINE);
-			AddLogEntry("Actual Count "+transStatus.paritcipantListAbort.size()+"\n", Level.FINE);
+			//AddLogEntry("Expected Count "+transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementCount()+"\n", Level.FINE);
+			//AddLogEntry("Actual Count "+transStatus.paritcipantListAbort.size()+"\n", Level.FINE);
 		}
 		uidTransactionStatusMap.put(trans.getTransactionID(), transStatus);
 		AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
@@ -323,6 +342,26 @@ public class TwoPC extends Node implements Runnable{
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
 		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
 		socketPush.close();
+	}
+	
+	/**
+	 * Method used to release ReadSet after second phase of Two Phase Commit among all participants
+	 * @param source
+	 * @param dest
+	 * @param transaction
+	 * @param elements
+	 */
+	private void releaseReadSet(NodeProto source, NodeProto dest, TransactionProto transaction , ElementsSetProto elements)
+	{
+		AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
+		TransactionProto trans = TransactionProto.newBuilder()
+				.setTransactionID(transaction.getTransactionID())
+				.setReadSet(elements)
+				.build();
+		TwoPCMsg msg = new TwoPCMsg(source, trans , TwoPCMsgType.RELEASE);
+		AddLogEntry("Sending Release ReadSet Msg "+msg+" to participant "+dest.getHost()+":"+dest.getPort());
+		SendTwoPCMessage(msg, dest);
+		AddLogEntry("*************************** End of TPC module ************************** ", Level.FINE);
 	}
 
 	/**

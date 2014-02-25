@@ -52,13 +52,13 @@ public class Common {
 	public enum State {ACTIVE, PAUSED};
 	public enum ReplayMsgType {REQEUST, RESPONSE, ACK};
 	public enum LeaderMsgType {REQUEST, RESPONSE};
-	public enum TransactionType{ STARTED, READINIT, READDONE, WRITEINIT, COMMIT, ABORT, PREPARE_DONE};
+	public enum TransactionType{ INIT, STARTED, READINIT, READDONE, WRITEINIT, COMMIT, ABORT, PREPARE_DONE};
 	public enum RequestType {PREPARE, COMMIT, ABORT};
 	public enum ClientOPMsgType{READ,WRITE,READ_RESPONSE,UNLOCK, COMMIT, RELEASE_RESOURCE, WRITE_RESPONSE,ABORT};
 	public enum MetaDataMsgType{REQEUST, RESPONSE};
 	public enum PaxosDetailsMsgType{ACCEPTORS, LEADER};
 	public enum PaxosMsgType{PREPARE, INIT_PAXOS, ACCEPT,ACK,COMMIT,ABORT, DECIDE};
-	public enum TwoPCMsgType{COMMIT, ABORT, INFO, PREPARE, ACK};
+	public enum TwoPCMsgType{COMMIT, ABORT, INFO, PREPARE, ACK, RELEASE};
 	public enum SiteCrashMsgType{CRASH,RECOVER};
 	public enum BcastMsgType{COMMIT_ACK,ABORT_ACK};
 	public enum PaxosLeaderState{PREPARE, ACCEPT, COMMIT, COMMIT_ACK, ABORT, ABORT_ACK};
@@ -67,6 +67,7 @@ public class Common {
 	public enum TPCState{INIT, COMMIT, COMMIT_ACK, ABORT, ABORT_ACK};
 	public static final long TRANS_TIMEOUT = 120000;
 	public static final long TPC_TIMEOUT = 80000;
+	public static final long TRANS_CLIENT_TIMEOUT = 10000;
 	
 	public static String getProperty(String str)
 	{

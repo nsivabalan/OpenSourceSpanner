@@ -285,6 +285,10 @@ public class PaxosAcceptor extends Node implements Runnable{
 						{
 							handleClientReleaseResourceMsg(msg);
 						}
+						else if(msg.getMsgType() == ClientOPMsgType.UNLOCK)
+						{
+							handleClientReleaseReadSet(msg);
+						}
 					}
 					else{
 						pendingRequests.add(msgwrap);
@@ -355,6 +359,10 @@ public class PaxosAcceptor extends Node implements Runnable{
 						else if(msg.getMsgType() == TwoPCMsgType.PREPARE)
 						{	
 							twoPhaseCoordinator.ProcessPrepareMessage(msg);
+						}
+						else if(msg.getMsgType() == TwoPCMsgType.RELEASE)
+						{	
+							ProcessReleaseResourceMessage(msg);
 						}
 						else if(msg.getMsgType() == TwoPCMsgType.COMMIT){
 							if(msg.isTwoPC()){
@@ -832,7 +840,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 			AddLogEntry("Handling process client read msg "+message);
 			NodeProto transClient = message.getSource();
 			TransactionProto trans = message.getTransaction();
-
+		
 			boolean isReadLock = true;
 			for(ElementProto element : trans.getReadSet().getElementsList())
 			{
@@ -850,6 +858,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 						.setTransactionStatus(TransactionStatusProto.ACTIVE)
 						.setReadSet(readValues)
 						.build();
+				uidTransMap.put(trans.getTransactionID(), new TransactionSource(trans, transClient, TwoPCMsgType.INFO));
 				read_response = new ClientOpMsg(nodeAddress, transaction, ClientOPMsgType.READ_RESPONSE, true);
 			}
 			else
@@ -971,6 +980,30 @@ public class PaxosAcceptor extends Node implements Runnable{
 		AddLogEntry("Received client release resource msg "+message);
 		TransactionProto trans = message.getTransaction();
 		//FIX ME: check if commited or aborted trans
+		if(trans.getReadSet() != null){
+			if(trans.getTransactionStatus() == TransactionStatusProto.COMMITTED)
+				lockTable.releaseReadLocks(trans.getReadSet(), trans.getTransactionID(), true);
+			else
+				lockTable.releaseReadLocks(trans.getReadSet(), trans.getTransactionID(), false);
+		}
+		else{
+			if(trans.getTransactionStatus() == TransactionStatusProto.COMMITTED)
+				lockTable.releaseWriteLocks(trans.getWriteSet(), trans.getTransactionID(), true);
+			else
+				lockTable.releaseWriteLocks(trans.getWriteSet(), trans.getTransactionID(), false);
+		}
+		AddLogEntry("Released all resources. No ack sent");
+	}
+	
+	/**
+	 * Process release resource message
+	 * @param message, ClientOpMsg
+	 */
+	private synchronized void handleClientReleaseReadSet(ClientOpMsg message)
+	{
+		AddLogEntry("Received client release resource msg "+message);
+		TransactionProto trans = message.getTransaction();
+		//FIX ME: check if commited or aborted trans
 		lockTable.releaseReadLocks(trans.getReadSet(), trans.getTransactionID(), true);
 		AddLogEntry("Released all resources. No ack sent");
 	}
@@ -997,6 +1030,20 @@ public class PaxosAcceptor extends Node implements Runnable{
 		}
 	}
 
+	
+	/**
+	 * Process release resource message from TwoPc
+	 * @param message, ClientOpMsg
+	 */
+	private synchronized void ProcessReleaseResourceMessage(TwoPCMsg message)
+	{
+		AddLogEntry("Received release resource(read set) msg "+message);
+		TransactionProto trans = message.getTransaction();
+		lockTable.releaseReadLocks(trans.getReadSet(), trans.getTransactionID(), true);
+		AddLogEntry("Released all resources. No ack sent");
+	}
+	
+	
 	/**
 	 * Method to process PAXOS PREPARE message
 	 * @param msg

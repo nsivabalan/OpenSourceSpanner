@@ -7,6 +7,7 @@ import java.net.InetAddress;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -29,6 +30,7 @@ import spanner.message.ClientOpMsg;
 import spanner.message.MetaDataMsg;
 import spanner.message.TwoPCMsg;
 import spanner.metadataservice.MetaDS;
+import spanner.node.TwoPC.TransactionStatus;
 import spanner.protos.Protos.ColElementProto;
 import spanner.protos.Protos.ElementProto;
 import spanner.protos.Protos.ElementsSetProto;
@@ -49,6 +51,9 @@ public class TransClient extends Node implements Runnable{
 	NodeProto metadataService ;
 	NodeProto transClient;
 	HashMap<String, NodeProto> clientMappings ;
+	HashMap<String, TransactionType> uidTransTypeMap = null;
+	private Map<String, TransactionStatus> uidTransactionStatusMap = new HashMap<String, TransactionStatus>();
+	private HashSet<String> pendingTransList = null;
 
 	public TransClient(String clientID, int port, boolean isNew) throws IOException
 	{
@@ -67,6 +72,8 @@ public class TransClient extends Node implements Runnable{
 		else
 			metadataService = NodeProto.newBuilder().setHost(mds[0]).setPort(Integer.parseInt(mds[1])).build();
 		clientMappings = new HashMap<String, NodeProto>();
+		uidTransTypeMap = new HashMap<String, TransactionType>();
+		pendingTransList = new HashSet<String>();
 	}
 
 	final class TransactionStatus {
@@ -74,25 +81,30 @@ public class TransClient extends Node implements Runnable{
 		HashMap<NodeProto, Boolean> readLocks;
 		TransactionType state;
 		int noOfReadLocks = 0;
+		Long initTimeStamp = null;
 		TransactionProto trans;
 		boolean isReadLockAcquired ;
 		NodeProto twoPC ;
 
 		public TransactionStatus(TransactionProto trans)
 		{			
-			this.trans = trans;
+
 			this.readLocks = new HashMap<NodeProto, Boolean>();
+			this.trans = trans;
+			this.isReadLockAcquired = false;
+			this.initTimeStamp = System.currentTimeMillis();
 			this.state = TransactionType.STARTED;
-			for(PartitionServerElementProto node: trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
-			{
-				readLocks.put(node.getPartitionServer().getHost(), false);
-			}
 			this.isReadLockAcquired = false;
 			twoPC = null;
+			if(trans != null){
+				for(PartitionServerElementProto node: trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
+				{
+					readLocks.put(node.getPartitionServer().getHost(), false);
+				}
+			}
+			
 		}		
 	}
-
-	private Map<String, TransactionStatus> uidTransactionStatusMap = new HashMap<String, TransactionStatus>();
 
 
 
@@ -137,14 +149,79 @@ public class TransClient extends Node implements Runnable{
 		context.term();
 	}
 
+	
+	public void executeDaemon()
+	{
+		while(true){
+			checkForPendingTrans();
+			try {
+				Thread.sleep(2000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
+
+	/**
+	 * Method to check for pending transactions. Triggers abort of the same after timeout
+	 */
+	private synchronized void checkForPendingTrans() 
+	{
+		Long curTime = new Date().getTime();
+		Set<String> pendingTransTemp = pendingTransList;
+		for(String uid: pendingTransTemp)
+		{
+			if(uidTransTypeMap.get(uid) != TransactionType.ABORT)
+			{
+				TransactionStatus transStatus = uidTransactionStatusMap.get(uid);
+				if(curTime - transStatus.initTimeStamp > Common.TRANS_CLIENT_TIMEOUT)
+				{	
+					//AddLogEntry("Transaction timed out "+uid+"\n");
+					if(uidTransTypeMap.get(uid) != TransactionType.ABORT)
+					{
+						//AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
+						AddLogEntry("Aborting the transaction "+uid+" due to time out");
+						ClientOpMsg response = new ClientOpMsg(transClient, uidTransactionStatusMap.get(uid).trans, ClientOPMsgType.ABORT);
+						//TwoPCMsg response = new TwoPCMsg(transClient, transStatus.trans, TwoPCMsgType.ABORT);
+						pendingTransList.remove(uid);
+						uidTransTypeMap.put(uid, TransactionType.ABORT);
+						uidTransactionStatusMap.put(uid, transStatus);
+						AddLogEntry("Sending Abort msg to Trans Client "+response, Level.INFO);
+						SendClientResponse(clientMappings.get(uid), response);
+
+						/*for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
+						{
+							NodeProto dest = partitionServer.getPartitionServer().getHost();
+							sendAbortInitMessage(transClient, dest, transStatus.trans, partitionServer.getElements());
+						}*/
+
+						for(PartitionServerElementProto partitionServer : transStatus.trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
+						{
+							NodeProto dest = partitionServer.getPartitionServer().getHost();
+							sendReleaseReadSetMessage(transClient, dest, transStatus.trans, partitionServer.getElements(), false);
+						}
+
+						//AddLogEntry("*************************** End of TPC module ************************** ", Level.FINE);
+					}
+
+				}
+			}
+		}
+	}
+
+
 	/**
 	 * Method used to process transaction request from user client
 	 * @param msg
 	 */
-	private void handleMetaDataRequest(MetaDataMsg msg)
+	private synchronized void handleMetaDataRequest(MetaDataMsg msg)
 	{
 		AddLogEntry("Handling Meta data request "+msg);
 		String uid = java.util.UUID.randomUUID().toString();
+		uidTransTypeMap.put(uid, TransactionType.INIT);
+		uidTransactionStatusMap.put(uid, new TransactionStatus(null));
+		pendingTransList.add(uid);
 		clientMappings.put(uid, msg.getSource());
 		MetaDataMsg message = new MetaDataMsg(transClient, msg.getReadSet(), msg.getWriteSet(), MetaDataMsgType.REQEUST, uid);
 		sendMetaDataMsg(message);
@@ -154,7 +231,7 @@ public class TransClient extends Node implements Runnable{
 	 * Method used to send Metadata msg to MDS
 	 * @param msg
 	 */
-	private void sendMetaDataMsg(MetaDataMsg msg)
+	private synchronized void sendMetaDataMsg(MetaDataMsg msg)
 	{
 		AddLogEntry("Sending Meta data request "+msg+" to MDService "+metadataService.getHost()+":"+metadataService.getPort());
 		socketPush = context.socket(ZMQ.PUSH);
@@ -168,7 +245,7 @@ public class TransClient extends Node implements Runnable{
 	 * Method used to handle meta data response from MDS
 	 * @param msg
 	 */
-	private void handleMetaDataResponse(MetaDataMsg msg)
+	private synchronized void handleMetaDataResponse(MetaDataMsg msg)
 	{
 		AddLogEntry("\nHandling meta data response from MDS :: "+msg);
 		TransactionMetaDataProto transaction = msg.getTransaction();
@@ -180,9 +257,12 @@ public class TransClient extends Node implements Runnable{
 				.setReadSetServerToRecordMappings(transaction.getReadSetServerToRecordMappings())
 				.setWriteSetServerToRecordMappings(transaction.getWriteSetServerToRecordMappings())
 				.build();
-		
+
 		TransactionStatus transStatus = new TransactionStatus(trans);
+		transStatus.initTimeStamp = System.currentTimeMillis();
 		transStatus.twoPC = transaction.getTwoPC();
+		uidTransTypeMap.put(transaction.getTransactionID(), TransactionType.READINIT );
+		uidTransactionStatusMap.put(transaction.getTransactionID(), transStatus);
 
 		if(trans.getReadSet()!= null && trans.getReadSet().getElementsCount() > 0){
 			for(PartitionServerElementProto partitionServer : trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
@@ -215,7 +295,7 @@ public class TransClient extends Node implements Runnable{
 	 * @param transaction
 	 * @param elements
 	 */
-	private void sendClientReadLockMessage(NodeProto dest, TransactionProto transaction , ElementsSetProto elements)
+	private synchronized void sendClientReadLockMessage(NodeProto dest, TransactionProto transaction , ElementsSetProto elements)
 	{
 		TransactionProto trans = TransactionProto.newBuilder()
 				.setTransactionID(transaction.getTransactionID())
@@ -231,7 +311,7 @@ public class TransClient extends Node implements Runnable{
 	 * Method to process incoming read response
 	 * @param message
 	 */
-	private void handleReadResponse(ClientOpMsg message)
+	private synchronized void handleReadResponse(ClientOpMsg message)
 	{
 		NodeProto source = message.getSource();
 		String uid = message.getTransaction().getTransactionID();
@@ -256,12 +336,15 @@ public class TransClient extends Node implements Runnable{
 			AddLogEntry("Cannot acquire read Locks. Aborting the transaction ");
 			transStatus.state = TransactionType.ABORT;
 			uidTransactionStatusMap.put(uid, transStatus);
-
+			uidTransTypeMap.put(uid, TransactionType.ABORT);
+			pendingTransList.remove(uid);
 			TransactionProto transResponse = TransactionProto.newBuilder()
 					.setTransactionID(transStatus.trans.getTransactionID())
 					.setTransactionStatus(TransactionStatusProto.ABORTED)
 					.setReadSet(transStatus.trans.getReadSet())
 					.build();
+			AddLogEntry("Releasing all read locks");
+			releaseLocks(transStatus, false);
 			AddLogEntry("Sending Abort msg to user client");
 			ClientOpMsg msg = new ClientOpMsg(transClient, transResponse, ClientOPMsgType.ABORT);
 			SendClientResponse(clientMappings.get(uid), msg);
@@ -295,8 +378,10 @@ public class TransClient extends Node implements Runnable{
 					e.printStackTrace();
 				}
 				transStatus.isReadLockAcquired = true;
+				transStatus.initTimeStamp = System.currentTimeMillis();
 				uidTransactionStatusMap.put(uid, transStatus);
-				if(transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementCount() != 0){
+				uidTransTypeMap.put(uid, TransactionType.WRITEINIT);
+				if(transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementCount() != 0){					
 					initiateWritePhase(transStatus.trans, transStatus.twoPC);
 				}
 				else{
@@ -309,8 +394,10 @@ public class TransClient extends Node implements Runnable{
 					transStatus.trans = updatedTrans;
 
 					uidTransactionStatusMap.put(uid, transStatus);
+					uidTransTypeMap.put(uid, TransactionType.COMMIT);
 					AddLogEntry("Read only Transaction completed", Level.INFO);
-					releaseLocks(transStatus);
+					pendingTransList.remove(uid);
+					releaseLocks(transStatus, true);
 					TransactionProto transResponse = TransactionProto.newBuilder()
 							.setTransactionID(transStatus.trans.getTransactionID())
 							.setTransactionStatus(TransactionStatusProto.COMMITTED)
@@ -331,7 +418,7 @@ public class TransClient extends Node implements Runnable{
 	 * @param trans
 	 * @param twoPC
 	 */
-	private void initiateWritePhase(TransactionProto trans, NodeProto twoPC)
+	private synchronized void initiateWritePhase(TransactionProto trans, NodeProto twoPC)
 	{
 		sendTwoPCInitMessagetoTPC( twoPC, trans);
 		try {
@@ -339,7 +426,6 @@ public class TransClient extends Node implements Runnable{
 			Thread.sleep(2000);
 			System.out.println("Woke up from sleep. Initiating TPC among all participants");
 		} catch (InterruptedException e1) {
-			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
 
@@ -358,14 +444,14 @@ public class TransClient extends Node implements Runnable{
 	 * @param transaction
 	 * @param elements
 	 */
-	private void sendClientWriteMessage(NodeProto source, NodeProto dest, TransactionProto transaction , ElementsSetProto elements)
+	private synchronized void sendClientWriteMessage(NodeProto source, NodeProto dest, TransactionProto transaction , ElementsSetProto elements)
 	{
 		TransactionProto trans = TransactionProto.newBuilder()
 				.setTransactionID(transaction.getTransactionID())
 				.setTransactionStatus(TransactionStatusProto.ACTIVE)
 				.setWriteSet(elements)
 				.build();
-		
+
 		ClientOpMsg msg = new ClientOpMsg(source, trans , ClientOPMsgType.WRITE);
 		AddLogEntry("Sending Client Write Request "+msg+" to "+dest.getHost()+":"+dest.getPort()+"\n");
 		SendClientOpMessage(msg, dest);
@@ -376,7 +462,7 @@ public class TransClient extends Node implements Runnable{
 	 * @param dest
 	 * @param transaction
 	 */
-	private void sendTwoPCInitMessagetoTPC(NodeProto dest, TransactionProto transaction )
+	private synchronized void sendTwoPCInitMessagetoTPC(NodeProto dest, TransactionProto transaction )
 	{
 		TransactionProto trans = TransactionProto.newBuilder()
 				.setTransactionID(transaction.getTransactionID())
@@ -386,7 +472,7 @@ public class TransClient extends Node implements Runnable{
 				.setReadSetServerToRecordMappings(transaction.getReadSetServerToRecordMappings())
 				.setWriteSetServerToRecordMappings(transaction.getWriteSetServerToRecordMappings())
 				.build();
-		
+
 		TwoPCMsg msg = new TwoPCMsg(transClient, trans, TwoPCMsgType.INFO);
 		AddLogEntry("Sending Transaction Init msg to TPC "+msg+"\n");
 		SendTwoPCInitMessage(msg, dest);
@@ -397,7 +483,7 @@ public class TransClient extends Node implements Runnable{
 	 * @param message
 	 * @param dest
 	 */
-	private void SendTwoPCInitMessage(TwoPCMsg message, NodeProto dest)
+	private synchronized void SendTwoPCInitMessage(TwoPCMsg message, NodeProto dest)
 	{
 		socketPush = context.socket(ZMQ.PUSH);
 		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
@@ -410,14 +496,14 @@ public class TransClient extends Node implements Runnable{
 	 * Method used to release Locks
 	 * @param transStatus
 	 */
-	private void releaseLocks(TransactionStatus transStatus)
+	private synchronized void releaseLocks(TransactionStatus transStatus, boolean isCommited)
 	{
 		TransactionProto trans = transStatus.trans;
 
 		for(PartitionServerElementProto partitionServer : trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
 		{
 			NodeProto dest = partitionServer.getPartitionServer().getHost();
-			sendCommitedMessage(dest, trans, partitionServer.getElements());
+			sendReleaseReadSetMessage(transClient, dest, trans, partitionServer.getElements(), isCommited);
 		}	
 	}
 
@@ -425,7 +511,7 @@ public class TransClient extends Node implements Runnable{
 	 * Method to processs TPC message from the TwoPC
 	 * @param msg
 	 */
-	private void handleTwoPCResponse(TwoPCMsg msg)
+	private synchronized void handleTwoPCResponse(TwoPCMsg msg)
 	{
 		//FIX ME
 		/*	TransactionProto trans = TransactionProto.newBuilder()
@@ -435,11 +521,20 @@ public class TransClient extends Node implements Runnable{
 				.setWriteSet(msg.getTransaction().getWriteSet())
 				.build();*/
 		AddLogEntry("Received TwoPC Response : "+msg);
+		String uid = msg.getTransaction().getTransactionID();
+		pendingTransList.remove(msg.getTransaction().getTransactionID());
+		
 		ClientOpMsg message = null;
-		if(msg.getMsgType() == TwoPCMsgType.COMMIT)
+		if(msg.getMsgType() == TwoPCMsgType.COMMIT){
 			message = new ClientOpMsg(transClient, msg.getTransaction(), ClientOPMsgType.COMMIT);
-		else 
+			uidTransTypeMap.put(uid, TransactionType.COMMIT);
+			releaseLocks(uidTransactionStatusMap.get(uid), true);
+		}
+		else{ 
 			message = new ClientOpMsg(transClient, msg.getTransaction(), ClientOPMsgType.ABORT);
+			uidTransTypeMap.put(uid, TransactionType.ABORT);
+			releaseLocks(uidTransactionStatusMap.get(uid), false);
+		}
 		SendClientResponse(clientMappings.get(msg.getTransaction().getTransactionID()), message);
 	}
 
@@ -470,7 +565,7 @@ public class TransClient extends Node implements Runnable{
 		AddLogEntry("Received Client Response :"+message);
 	}
 
-	
+
 	/**
 	 * Method used to send ClientopMsg to user client
 	 * @param message
@@ -500,6 +595,55 @@ public class TransClient extends Node implements Runnable{
 		socketPush.close();
 	}
 
+	/**
+	 * Method used to initiate Abort during second phase of Two Phase Commit among all participants
+	 * @param source
+	 * @param dest
+	 * @param transaction
+	 * @param elements
+	 */
+	private void sendAbortInitMessage(NodeProto source, NodeProto dest, TransactionProto transaction , ElementsSetProto elements)
+	{
+		TransactionProto trans = TransactionProto.newBuilder()
+				.setTransactionID(transaction.getTransactionID())
+				.setTransactionStatus(TransactionStatusProto.ABORTED)
+				.setWriteSet(elements)
+				.build();
+		ClientOpMsg msg = new ClientOpMsg(source, trans , ClientOPMsgType.RELEASE_RESOURCE);
+		AddLogEntry("Sending Abort Msg "+msg+" to participant "+dest.getHost()+":"+dest.getPort());
+		SendClientOpMessage(msg, dest);
+	}
+
+
+	/**
+	 * Method used to release Read Set during second phase of Two Phase Commit among all participants
+	 * @param source
+	 * @param dest
+	 * @param transaction
+	 * @param elements
+	 */
+	private void sendReleaseReadSetMessage(NodeProto source, NodeProto dest, TransactionProto transaction , ElementsSetProto elements, boolean isCommited)
+	{
+		TransactionProto trans = null;
+		if(isCommited){
+			trans = TransactionProto.newBuilder()
+					.setTransactionID(transaction.getTransactionID())
+					.setTransactionStatus(TransactionStatusProto.COMMITTED)
+					.setReadSet(elements)
+					.build();
+		}
+		else{
+			trans = TransactionProto.newBuilder()
+					.setTransactionID(transaction.getTransactionID())
+					.setTransactionStatus(TransactionStatusProto.ABORTED)
+					.setReadSet(elements)
+					.build();
+		}
+		ClientOpMsg msg = new ClientOpMsg(source, trans , ClientOPMsgType.RELEASE_RESOURCE);
+		AddLogEntry("Sending release Read Set Msg "+msg+" to participant "+dest.getHost()+":"+dest.getPort());
+		SendClientOpMessage(msg, dest);
+	}
+
 
 	public static void main(String[] args) throws IOException, ClassNotFoundException {
 
@@ -512,6 +656,7 @@ public class TransClient extends Node implements Runnable{
 		boolean isNew = Boolean.parseBoolean(args[2]);
 		TransClient client = new TransClient(args[0], port, isNew);
 		new Thread(client).start();
+		client.executeDaemon();
 	}
 
 }

@@ -164,7 +164,8 @@ public class LockTable {
 		LockHolders lockHolder = lockTable.get(element);
 
 		if (lockHolder==null) {
-			if (committed) throw new RuntimeException("realeasing a non existing lock "+element);
+			//if (committed) throw new RuntimeException("realeasing a non existing lock "+element);
+			writeToLockLogFile("LOCK_ALREADY_RELEASED", transactionId, element);
 		}
 
 		boolean containsTheElement = lockHolder.getReadLockHolders().remove(new Lock(transactionId, System.currentTimeMillis()));
@@ -172,7 +173,8 @@ public class LockTable {
 		lockTable.put(element, lockHolder);
 		
 		if (!containsTheElement) {
-			if (committed) throw new RuntimeException("releasing a non existing lock "+element);
+			//if (committed) throw new RuntimeException("releasing a non existing lock "+element);
+			writeToLockLogFile("LOCK_ALREADY_RELEASED", transactionId, element);
 		}
 		else{
 			writeToLockLogFile("RELEASE_READ_LOCK", transactionId, element);
@@ -192,11 +194,13 @@ public class LockTable {
 		LockHolders lockHolder = lockTable.get(element);
 
 		if (lockHolder==null) {
-			if (committed) throw new RuntimeException("realeasing a non existing lock "+element);
+			//if (committed) throw new RuntimeException("realeasing a non existing lock "+element);
+			writeToLockLogFile("LOCK_ALREADY_RELEASED", transactionId, element);
 		}
 
 		if (lockHolder.getWriteLockHolder()==null) {
-			if (committed) throw new RuntimeException("realeasing a non existing lock "+element);
+			//if (committed) throw new RuntimeException("realeasing a non existing lock "+element);
+			writeToLockLogFile("LOCK_ALREADY_RELEASED", transactionId, element);
 		}
 
 		lockHolder.setWriteLockHolder(null);
