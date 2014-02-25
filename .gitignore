@@ -1,5 +1,6 @@
 *.class
-
+logs/
+temp/
 
 # Package Files #
 *.jar
