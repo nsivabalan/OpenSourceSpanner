@@ -391,6 +391,7 @@ public class TransClient extends Node implements Runnable{
 							.setTransactionID(transStatus.trans.getTransactionID())
 							.setTransactionStatus(TransactionStatusProto.ACTIVE)
 							.setReadSet(transStatus.trans.getReadSet())
+							.setReadSetServerToRecordMappings(transStatus.trans.getReadSetServerToRecordMappings())
 							.build();
 					transStatus.trans = updatedTrans;
 
@@ -502,7 +503,7 @@ public class TransClient extends Node implements Runnable{
 	private synchronized void releaseLocks(TransactionStatus transStatus, boolean isCommited)
 	{
 		TransactionProto trans = transStatus.trans;
-
+		AddLogEntry("Releasing All read Sets ");
 		for(PartitionServerElementProto partitionServer : trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
 		{
 			NodeProto dest = partitionServer.getPartitionServer().getHost();
