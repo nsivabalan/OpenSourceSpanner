@@ -94,7 +94,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		this.shard = shard;
 		context = ZMQ.context(1);
 		//ZMQ.Context context = ZMQ.context(1);
-		LOGGER = Logger.getLogger(nodeId);
+	//	LOGGER = Logger.getLogger(nodeId);
 		String[] hostDetails = Common.getProperty(nodeId).split(":");
 		socket = context.socket(ZMQ.PULL); 
 		//create Log file
