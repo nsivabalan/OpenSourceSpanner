@@ -398,7 +398,9 @@ public class TransClient extends Node implements Runnable{
 					uidTransTypeMap.put(uid, TransactionType.COMMIT);
 					AddLogEntry("Read only Transaction completed", Level.INFO);
 					pendingTransList.remove(uid);
+					
 					releaseLocks(transStatus, true);
+					
 					TransactionProto transResponse = TransactionProto.newBuilder()
 							.setTransactionID(transStatus.trans.getTransactionID())
 							.setTransactionStatus(TransactionStatusProto.COMMITTED)
@@ -504,6 +506,7 @@ public class TransClient extends Node implements Runnable{
 		for(PartitionServerElementProto partitionServer : trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
 		{
 			NodeProto dest = partitionServer.getPartitionServer().getHost();
+			AddLogEntry("Sending release READSET msg to "+dest.getHost()+":"+dest.getPort());
 			sendReleaseReadSetMessage(transClient, dest, trans, partitionServer.getElements(), isCommited);
 		}	
 	}
@@ -645,7 +648,7 @@ public class TransClient extends Node implements Runnable{
 					.build();
 		}
 		ClientOpMsg msg = new ClientOpMsg(source, trans , ClientOPMsgType.RELEASE_RESOURCE);
-		AddLogEntry("Sending release Read Set Msg "+msg+" to participant "+dest.getHost()+":"+dest.getPort());
+		AddLogEntry("Sending release Read Set Msg "+msg+" to participant :: "+dest.getHost()+":"+dest.getPort());
 		SendClientOpMessage(msg, dest);
 	}
 
