@@ -248,6 +248,9 @@ public class PaxosAcceptor extends Node implements Runnable{
 					}
 				}
 			}
+			else{
+				AddLogEntry("Checking txn "+logPos+" >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+			}
 		}
 	}
 
