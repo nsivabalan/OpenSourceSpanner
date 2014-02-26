@@ -1,10 +1,3 @@
-export CLASSPATH=.:bin/:/home/sivabalan/Documents/softies/jzmq-master/src/zmq.jar:/usr/local/lib/libjzmq.so:/usr/local/share/java/zmq.jar:/home/sivabalan/Documents/ayasdi/backend/ayasdi-backend-7f5dd7f011e6/lib/common/protobuf-java-2.4.1.jar:/home/sivabalan/Downloads/hbase/hbase-0.94.5/hbase-0.94.5.jar:/home/sivabalan/hbasejars/hadoop-core-1.0.4.jar:/home/sivabalan/hbasejars/commons-logging-1.1.1.jar:/home/sivabalan/hbasejars/commons-configuration-1.6.jar:/home/sivabalan/hbasejars/commons-lang-2.5.jar:/home/sivabalan/hbasejars/log4j-1.2.16.jar:/usr/local/hbase/hbase-0.94.5/:/usr/local/hbase/hbase-0.94.5/lib/zookeeper-3.4.5.jar:/usr/local/hbase/hbase-0.94.5/lib/slf4j-log4j12-1.4.3.jar:/usr/local/hbase/hbase-0.94.5/lib/log4j-1.2.16.jar:/usr/local/hbase/hbase-0.94.5/lib/slf4j-api-1.4.3.jar:/home/sivabalan/jars/gson-2.2.2.jar:/home/sivabalan/jars/commons-io-1.2.jar:/home/sivabalan/jars/commons-collections-3.2.1.jar:/home/sivabalan/jars/commons-cli-1.1.jar
-java -Djava.library.path=/usr/local/lib spanner.node.Participant S2 1
-java -Djava.library.path=/usr/local/lib spanner.node.TransClient client1 12345
-java -Djava.library.path=/usr/local/lib spanner.metadataservice.MDService
- java -Djava.library.path=/usr/local/lib spanner.node.UserClient client2 13254
-
-
 find . -name "*.java" -print | xargs javac -d bin
 
 export CLASSPATH=/home/ubuntu/OpenSourceSpanner/bin/:/home/ubuntu/OpenSourceSpanner/:/home/ubuntu/OpenSourceSpanner/lib/commons-cli-1.1.jar:/home/ubuntu/OpenSourceSpanner/lib/commons-configuration-1.6.jar:/home/ubuntu/OpenSourceSpanner/lib/commons-io-1.2.jar:/home/ubuntu/OpenSourceSpanner/lib/commons-lang-2.5.jar:/home/ubuntu/OpenSourceSpanner/lib/commons-logging-1.1.1.jar:/home/ubuntu/OpenSourceSpanner/lib/gson-2.2.2.jar:/home/ubuntu/OpenSourceSpanner/lib/hadoop-core-1.0.4.jar:/home/ubuntu/OpenSourceSpanner/lib/hbase-0.94.5.jar:/home/ubuntu/OpenSourceSpanner/lib/log4j-1.2.16.jar:/home/ubuntu/OpenSourceSpanner/lib/protobuf-java-2.4.0a.jar:/home/ubuntu/OpenSourceSpanner/lib/zookeeper-3.4.5.jar:/usr/local/share/java/zmq.jar:/home/ubuntu/OpenSourceSpanner/lib/slf4j-api-1.7.6.jar
