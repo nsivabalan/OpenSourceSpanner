@@ -174,12 +174,13 @@ public class UserYCSBClient extends Node implements Runnable{
 	 * @param readSet
 	 * @param writeSet
 	 */
-	private void initiateTrans(HashMap<String, ArrayList<String>> readSet, HashMap<String, HashMap<String, String>> writeSet)
+	private synchronized void initiateTrans(HashMap<String, ArrayList<String>> readSet, HashMap<String, HashMap<String, String>> writeSet)
 	{
 		String uid = java.util.UUID.randomUUID().toString();
 		MetaDataMsg msg = new MetaDataMsg(clientNode, readSet, writeSet, MetaDataMsgType.REQEUST);
 		msg.setUID(uid);
 		inputs.put(uid, new TransDetail(System.currentTimeMillis()));
+		AddLogEntry("Sent Txn "+uid+" with startTime "+inputs.get(uid).getStartTime());
 		sendMetaDataMsg(msg);
 	}
 
@@ -187,7 +188,7 @@ public class UserYCSBClient extends Node implements Runnable{
 	 * Method to send msg to MDS
 	 * @param msg
 	 */
-	private void sendMetaDataMsg(MetaDataMsg msg)
+	private synchronized void sendMetaDataMsg(MetaDataMsg msg)
 	{
 		AddLogEntry("Sending Client Request "+msg+"to "+transClient.getHost()+":"+transClient.getPort()+"\n");
 		socketPush = context.socket(ZMQ.PUSH);
@@ -201,7 +202,7 @@ public class UserYCSBClient extends Node implements Runnable{
 	 * Method to process transaction response
 	 * @param msg
 	 */
-	private void ProcessClientResponse(ClientOpMsg msg)
+	private synchronized void ProcessClientResponse(ClientOpMsg msg)
 	{
 		AddLogEntry("Received Client Response "+msg);
 		
@@ -225,16 +226,12 @@ public class UserYCSBClient extends Node implements Runnable{
 	public static void main(String[] args) throws IOException, ClassNotFoundException {
 
 		if(args.length != 3)
-			System.out.println("Usage: UserCient <ClientID> <port> <isNewLog> <FilePath>");
+			System.out.println("Usage: UserCient <ClientID> <port> <isNewLog>");
 
 		int port = Integer.parseInt(args[1]);
 		boolean isNew = Boolean.parseBoolean(args[2]);
-		File inputFile = null;
-		if(args[3] == null)
-			inputFile = new File(args[3]);
-		else
-			inputFile = new File(Common.dataFile);
-		UserClient client = new UserClient(args[0], port, isNew);
+		File inputFile = new File(Common.dataFile);
+		UserYCSBClient client = new UserYCSBClient(args[0], port, isNew, inputFile);
 		new Thread(client).start();
 		client.init();
 	}
