@@ -192,11 +192,11 @@ public class TransClient extends Node implements Runnable{
 						AddLogEntry("Sending Abort msg to Trans Client "+response, Level.INFO);
 						SendClientResponse(clientMappings.get(uid), response);
 
-						/*for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
+						for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
 						{
 							NodeProto dest = partitionServer.getPartitionServer().getHost();
 							sendAbortInitMessage(transClient, dest, transStatus.trans, partitionServer.getElements());
-						}*/
+						}
 
 						for(PartitionServerElementProto partitionServer : transStatus.trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
 						{
