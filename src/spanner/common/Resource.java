@@ -108,6 +108,7 @@ public class Resource {
 			{	
 				put.add(Bytes.toBytes(familyName), Bytes.toBytes(colElem.getCol()), Bytes
 						.toBytes(colElem.getValue()));
+				
 				buffer.append(colElem.getCol()+","+colElem.getValue()+";");
 			}
 			table.put(put);
@@ -182,26 +183,32 @@ public class Resource {
 				String rowKey = element.getRow();
 				Get get = new Get(rowKey.getBytes());
 				get.addFamily(familyName.getBytes());
+				
+				ArrayList<String> colList = new ArrayList<String>();
+				for(ColElementProto colElem : element.getColsList()){			
+					colList.add(colElem.getCol());
+					get.addColumn(familyName.getBytes(), colElem.getCol().getBytes());
+				}
 				ElementProto.Builder recordBuilder = ElementProto.newBuilder().setRow(rowKey);
 				//HashMap<String, String> record = hbaseMap.get(rowKey);
 				buffer.append("Reading Record "+rowKey+" :: ");
 				Result rs = table.get(get);
-				ArrayList<String> colList = new ArrayList<String>();
-				for(ColElementProto colElem : element.getColsList())			
-					colList.add(colElem.getCol());
+				
 				
 				logger.log(Level.INFO, "List of cols "+colList);
 				for(KeyValue kv : rs.raw()){
 					
-					String colName = new String(kv.getRow());
+					String colName = new String(kv.getQualifier());
+					
+					
 					String colVal = new String(kv.getValue());
 					logger.log(Level.INFO, " :: "+colName+", "+colVal);
-					if(colList.contains(colName)){
+					//if(colList.contains(colName)){
 						logger.log(Level.INFO, "Found col "+colName+" with val "+colVal);
 						ColElementProto colElement = ColElementProto.newBuilder().setCol(colName).setValue(colVal).build();
 						recordBuilder.addCols(colElement);
 						buffer.append(colName+","+colVal+";");
-					}
+					//}
 				}
 
 				buffer.append("\n");
