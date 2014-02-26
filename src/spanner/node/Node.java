@@ -18,25 +18,27 @@ public class Node {
 	protected String nodeId;
 
 	protected Common.State NodeState;
-	protected static Logger LOGGER = null;
+	protected Logger LOGGER = null;
 	private static FileHandler logFileHandler;
 	private static File logFile;
 
-	public Node(String nodeId, boolean isNew) throws IOException
+	public Node(String nodeId, boolean isNew, boolean isTPC) throws IOException
 	{
 		this.nodeId = nodeId;
 		this.NodeState = Common.State.ACTIVE;
-		LOGGER = Logger.getLogger(nodeId);
-		//Logging Specific
-		
-		logFile = new File(Common.FilePath+"/"+this.nodeId+".log");
-		createLogFile(logFile, isNew);
-		logFileHandler = new FileHandler(Common.FilePath+"/"+this.nodeId+".log", true);
-		logFileHandler.setFormatter(new SimpleFormatter());
+		if(!isTPC){
+			LOGGER = Logger.getLogger(nodeId);
+			//Logging Specific
 
-		LOGGER.setLevel(Level.INFO); //Sets the default level if not provided.		
-		LOGGER.addHandler(logFileHandler);
-		LOGGER.setUseParentHandlers(false);
+			logFile = new File(Common.FilePath+"/"+this.nodeId+".log");
+			createLogFile(logFile, isNew);
+			logFileHandler = new FileHandler(Common.FilePath+"/"+this.nodeId+".log", true);
+			logFileHandler.setFormatter(new SimpleFormatter());
+
+			LOGGER.setLevel(Level.INFO); //Sets the default level if not provided.		
+			LOGGER.addHandler(logFileHandler);
+			LOGGER.setUseParentHandlers(false);
+		}
 	}	
 
 	/**

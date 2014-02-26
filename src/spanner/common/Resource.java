@@ -37,6 +37,9 @@ public class Resource {
 		conf.set("hbase.master","localhost:9000");
 		String[] familys = new String[]{familyName};
 		this.logger = logger;
+		//FIX ME: remove below line
+		System.out.println("Logger "+logger+" ....");
+		logger.log(Level.INFO, " test msg logging ...........................................................");
 		try {
 			this.createTable(familys);
 		} catch (Exception e) {

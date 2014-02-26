@@ -64,11 +64,12 @@ public class TwoPC extends Node implements Runnable{
 
 
 	private Map<String, TransactionStatus> uidTransactionStatusMap;
-	protected static Logger LOGGER = null;
 
-	public TwoPC(String shard, NodeProto nodeAddress, ZMQ.Context context , boolean isNew) throws IOException
+	public TwoPC(String shard, NodeProto nodeAddress, ZMQ.Context context , boolean isNew, Logger LOGGER) throws IOException
 	{
-		super(shard+"_TPC", isNew);
+		super(shard+"_TPC", isNew, true);
+		this.LOGGER = LOGGER;
+		//AddLogEntry("Logger ::::::::::::: TPC ::::::::::::; "+this.LOGGER);
 		this.context = context;
 		pendingTransactions = new ArrayList<String>();
 		br = new BufferedReader(new InputStreamReader(System.in));
@@ -76,6 +77,7 @@ public class TwoPC extends Node implements Runnable{
 		this.nodeAddress = nodeAddress;
 		uidTransTypeMap = new HashMap<String, TransactionType>();
 		pendingTrans = new HashSet<String>();
+		
 	}
 
 	public void run()

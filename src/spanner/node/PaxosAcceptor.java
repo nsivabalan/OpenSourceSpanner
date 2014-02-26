@@ -84,13 +84,14 @@ public class PaxosAcceptor extends Node implements Runnable{
 	TwoPC twoPhaseCoordinator = null;
 	private int logCounter = 0;
 	RandomAccessFile logRAF = null;
-	//private static ResourceHM localResource = null;
-	private static Resource localResource = null;
+	private static ResourceHM localResource = null;
+	//private static Resource localResource = null;
 	private static FileHandler logFile = null;
 
 	public PaxosAcceptor(String shard, String nodeId, boolean isNew) throws IOException
 	{
-		super(nodeId, isNew);
+		super(nodeId, isNew, false);
+		//AddLogEntry("Logger ::::::::::::: PAXOS ACCEPTOR ::::::::::::; "+this.LOGGER);
 		this.shard = shard;
 		context = ZMQ.context(1);
 		//ZMQ.Context context = ZMQ.context(1);
@@ -104,7 +105,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 
 		socket.bind("tcp://*:"+hostDetails[1]);
 		nodeAddress = NodeProto.newBuilder().setHost(hostDetails[0]).setPort(Integer.parseInt(hostDetails[1])).build();
-		twoPhaseCoordinator = new TwoPC(shard, nodeAddress, context, isNew);
+		twoPhaseCoordinator = new TwoPC(shard, nodeAddress, context, isNew, LOGGER);
 		new Thread(twoPhaseCoordinator).start();
 		//AddLogEntry("local address " +InetAddress.getLocalHost().getHostAddress());
 		AddLogEntry("Connected @ "+nodeAddress.getHost()+":"+nodeAddress.getPort(), Level.FINE);
@@ -114,8 +115,8 @@ public class PaxosAcceptor extends Node implements Runnable{
 		lockTable = new LockTable(nodeId, isNew);
 		pendingPaxosInstances = new HashSet<Integer>();
 		uidTransMap = new HashMap<String, TransactionSource>();
-		//localResource = new ResourceHM(this.LOGGER);
-		localResource = new Resource(this.LOGGER);
+		localResource = new ResourceHM(this.LOGGER);
+		//localResource = new Resource(this.LOGGER);
 		dummyInstance = new PaxosInstance(null,  null);
 		state = PLeaderState.INIT;
 		myId = Integer.parseInt(nodeId);
@@ -725,6 +726,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 			logCounter = logPosition;
 			if(leaderAddress.equals(nodeAddress)){
 				isLeader= true;
+			//	twoPhaseCoordinator = new TwoPC(shard, nodeAddress, context, isNew);
 				this.state = PLeaderState.ACTIVE;
 				this.AddLogEntry("I am the leader as given by MDS\n" , Level.INFO);
 			}
@@ -1106,6 +1108,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 			if(paxInstance.acks.size() > acceptorsCount/2 && !paxInstance.isAcceptSent)
 			{
 				this.isLeader = true;
+			//	twoPhaseCoordinator = new TwoPC(shard, nodeAddress, context, isNew);
 				leaderAddress = nodeAddress;
 				paxInstance.isAcceptSent= true;
 				announceMDSAboutLeaderShip();
