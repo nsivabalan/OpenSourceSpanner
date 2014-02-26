@@ -192,8 +192,10 @@ public class Resource {
 				
 				logger.log(Level.INFO, "List of cols "+colList);
 				for(KeyValue kv : rs.raw()){
+					
 					String colName = new String(kv.getRow());
 					String colVal = new String(kv.getValue());
+					logger.log(Level.INFO, " :: "+colName+", "+colVal);
 					if(colList.contains(colName)){
 						logger.log(Level.INFO, "Found col "+colName+" with val "+colVal);
 						ColElementProto colElement = ColElementProto.newBuilder().setCol(colName).setValue(colVal).build();
