@@ -46,6 +46,7 @@ public class Common {
 	public static String FilePath = osspanner_home+"/logs/spannerlogs";
 	public static String PaxosLog = osspanner_home+"/logs/paxoslog/";
 	public static String LockFile = osspanner_home+"/logs/locks/";
+	public static String dataFile = osspanner_home+"/data/input.txt";
 	
 	public static String tableName = "default_Table";
 	

@@ -60,6 +60,12 @@ public class MetaDataMsg extends MessageBase{
 		return this.writeSet;
 	}
 	
+	public void setUID(String uid)
+	{
+		this.transID = uid;
+	}
+	
+	
 	public NodeProto getSource()
 	{
 		return this.source;
