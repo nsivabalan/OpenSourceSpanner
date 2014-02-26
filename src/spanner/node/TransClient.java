@@ -189,8 +189,6 @@ public class TransClient extends Node implements Runnable{
 						uidTransTypeMap.put(uid, TransactionType.ABORT);
 						transStatus.isClientResponseSent = true;
 						uidTransactionStatusMap.put(uid, transStatus);
-						AddLogEntry("Sending Abort msg to Trans Client "+response, Level.INFO);
-						SendClientResponse(clientMappings.get(uid), response);
 
 						for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
 						{
@@ -203,7 +201,8 @@ public class TransClient extends Node implements Runnable{
 							NodeProto dest = partitionServer.getPartitionServer().getHost();
 							sendReleaseReadSetMessage(transClient, dest, transStatus.trans, partitionServer.getElements(), false);
 						}
-
+						AddLogEntry("Sending Abort msg to Trans Client "+response, Level.INFO);
+						SendClientResponse(clientMappings.get(uid), response);
 						//AddLogEntry("*************************** End of TPC module ************************** ", Level.FINE);
 					}
 
