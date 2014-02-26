@@ -296,6 +296,10 @@ public class PaxosAcceptor extends Node implements Runnable{
 						{
 							handleClientReleaseReadSet(msg);
 						}
+						else if(msg.getMsgType() == ClientOPMsgType.ABORT)
+						{
+							twoPhaseCoordinator.handleClientAbortMsg(msg);
+						}
 					}
 					else{
 						pendingRequests.add(msgwrap);
@@ -1016,6 +1020,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		AddLogEntry("Released all resources. No ack sent");
 	}
 
+	
 	/**
 	 * Method to send Prepare message
 	 * @param message

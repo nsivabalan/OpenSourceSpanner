@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import spanner.message.ClientOpMsg;
 import spanner.message.TwoPCMsg;
 import spanner.protos.Protos.ElementsSetProto;
 import spanner.protos.Protos.NodeProto;
@@ -403,6 +405,44 @@ public class TwoPC extends Node implements Runnable{
 		socket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
 	}
 
+	
+	/**
+	 * Handle abort message from a trans client
+	 * @param message, ClientOpMsg
+	 */
+	public synchronized void handleClientAbortMsg(ClientOpMsg message)
+	{
+		AddLogEntry("Received Trans Client Abort msg "+message);
+		TransactionProto trans = message.getTransaction();
+		AddLogEntry("Received Abort msg "+message+" from Trans Client "+message.getSource().getHost()+":"+message.getSource().getPort());
+		String uid = trans.getTransactionID();
+		TransactionStatus transStatus = uidTransactionStatusMap.get(trans.getTransactionID());
+		if(uidTransTypeMap.get(uid) != TransactionType.ABORT){
+			AddLogEntry("Received abort message from one participant for first time. Aborting the transaction ", Level.FINE);
+			transStatus.transState = TransactionType.ABORT;
+			uidTransTypeMap.put(uid,  TransactionType.ABORT);
+			transStatus.transState = TransactionType.ABORT;
+			uidTransactionStatusMap.put(uid, transStatus);
+			TwoPCMsg abort_response = new TwoPCMsg(nodeAddress, trans, TwoPCMsgType.ABORT);
+			if(pendingTrans.contains(uid))
+				pendingTrans.remove(trans.getTransactionID());
+			SendTwoPCMessage(abort_response, transStatus.source);	
+
+			for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
+			{
+				NodeProto dest = partitionServer.getPartitionServer().getHost();
+					sendAbortInitMessage(nodeAddress, dest, trans, partitionServer.getElements());
+				
+			}
+			
+			for(PartitionServerElementProto partitionServer : transStatus.trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
+			{
+				NodeProto dest = partitionServer.getPartitionServer().getHost();
+					releaseReadSet(nodeAddress, dest, trans, partitionServer.getElements());
+			}
+		}
+	}
+	
 	/*
 	public void ProcessClientReadMessage(ClientOpMsg message)
 	{

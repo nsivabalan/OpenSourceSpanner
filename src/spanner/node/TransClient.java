@@ -612,11 +612,13 @@ public class TransClient extends Node implements Runnable{
 				.setTransactionStatus(TransactionStatusProto.ABORTED)
 				.setWriteSet(elements)
 				.build();
-		ClientOpMsg msg = new ClientOpMsg(source, trans , ClientOPMsgType.RELEASE_RESOURCE);
-		AddLogEntry("Sending Abort Msg "+msg+" to participant "+dest.getHost()+":"+dest.getPort());
+		ClientOpMsg msg = new ClientOpMsg(source, trans , ClientOPMsgType.ABORT);
+		TransactionStatus transStatus = uidTransactionStatusMap.get(transaction.getTransactionID());
+		
+		//TwoPCMsg msg = new TwoPCMsg(source, trans, TwoPCMsgType.ABORT);
+		AddLogEntry("Sending Abort Msg "+msg+" to participant "+transStatus.twoPC.getHost()+":"+transStatus.twoPC.getPort());
 		SendClientOpMessage(msg, dest);
 	}
-
 
 	/**
 	 * Method used to release Read Set during second phase of Two Phase Commit among all participants
