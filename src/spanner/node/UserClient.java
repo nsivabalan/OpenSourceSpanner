@@ -29,7 +29,7 @@ public class UserClient extends Node implements Runnable{
 	NodeProto clientNode;
 	public UserClient(String clientID, int port, boolean isNew) throws IOException
 	{
-		super(clientID, isNew, false);
+		super(clientID, isNew);
 		context = ZMQ.context(1);
 		InetAddress addr = InetAddress.getLocalHost();
 		clientNode = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(port).build();

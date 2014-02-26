@@ -32,7 +32,7 @@ public class MetaDS extends Node{
 
 	public MetaDS(boolean isNew) throws IOException
 	{
-		super("MDS", isNew, false);
+		super("MDS", isNew);
 		serverAddressMap = new HashMap<String,NodeProto>();
 		shardToParticipantMap = new HashMap<String, NodeProto>();
 		shardToAcceptorsMap = new HashMap<String, ArrayList<NodeProto>>();

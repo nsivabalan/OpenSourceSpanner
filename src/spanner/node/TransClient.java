@@ -57,7 +57,7 @@ public class TransClient extends Node implements Runnable{
 
 	public TransClient(String clientID, int port, boolean isNew) throws IOException
 	{
-		super(clientID, isNew, false);
+		super(clientID, isNew);
 		context = ZMQ.context(1);
 		String[] tsClient = Common.getProperty("mds").split(":");
 		InetAddress addr = InetAddress.getLocalHost();

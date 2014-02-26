@@ -32,7 +32,7 @@ public class MDService extends Node implements Runnable{
 	
 	public MDService(String MDservice, boolean isNew) throws IOException
 	{
-		super(MDservice, isNew, false);
+		super(MDservice, isNew);
 		context = ZMQ.context(1);
 		String[] mds = Common.getProperty("mds").split(":");
 		this.port = Integer.parseInt(mds[1]);

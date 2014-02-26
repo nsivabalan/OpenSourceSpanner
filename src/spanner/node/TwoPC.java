@@ -69,9 +69,8 @@ public class TwoPC extends Node implements Runnable{
 
 	public TwoPC(String shard, NodeProto nodeAddress, ZMQ.Context context , boolean isNew, Logger LOGGER) throws IOException
 	{
-		super(shard+"_TPC", isNew, true);
+		super(shard+"_TPC", isNew, LOGGER);
 		this.LOGGER = LOGGER;
-		//AddLogEntry("Logger ::::::::::::: TPC ::::::::::::; "+this.LOGGER);
 		this.context = context;
 		pendingTransactions = new ArrayList<String>();
 		br = new BufferedReader(new InputStreamReader(System.in));

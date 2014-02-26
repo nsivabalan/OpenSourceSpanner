@@ -90,12 +90,10 @@ public class PaxosAcceptor extends Node implements Runnable{
 
 	public PaxosAcceptor(String shard, String nodeId, boolean isNew) throws IOException
 	{
-		super(nodeId, isNew, false);
+		super(nodeId, isNew);
 		//AddLogEntry("Logger ::::::::::::: PAXOS ACCEPTOR ::::::::::::; "+this.LOGGER);
 		this.shard = shard;
 		context = ZMQ.context(1);
-		//ZMQ.Context context = ZMQ.context(1);
-	//	LOGGER = Logger.getLogger(nodeId);
 		String[] hostDetails = Common.getProperty(nodeId).split(":");
 		socket = context.socket(ZMQ.PULL); 
 		//create Log file
