@@ -84,8 +84,8 @@ public class PaxosAcceptor extends Node implements Runnable{
 	TwoPC twoPhaseCoordinator = null;
 	private int logCounter = 0;
 	RandomAccessFile logRAF = null;
-	private static ResourceHM localResource = null;
-	//private static Resource localResource = null;
+	//private static ResourceHM localResource = null;
+	private static Resource localResource = null;
 	private static FileHandler logFile = null;
 
 	public PaxosAcceptor(String shard, String nodeId, boolean isNew) throws IOException
@@ -115,8 +115,8 @@ public class PaxosAcceptor extends Node implements Runnable{
 		lockTable = new LockTable(nodeId, isNew);
 		pendingPaxosInstances = new HashSet<Integer>();
 		uidTransMap = new HashMap<String, TransactionSource>();
-		localResource = new ResourceHM(this.LOGGER);
-		//localResource = new Resource(this.LOGGER);
+		//localResource = new ResourceHM(this.LOGGER);
+		localResource = new Resource(this.LOGGER);
 		dummyInstance = new PaxosInstance(null,  null);
 		state = PLeaderState.INIT;
 		myId = Integer.parseInt(nodeId);
