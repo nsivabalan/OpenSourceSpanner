@@ -128,6 +128,9 @@ public class TwoPC extends Node implements Runnable{
 					}
 
 				}
+				else{
+					AddLogEntry("Checking for trans "+uid);
+				}
 			}
 		}
 	}
