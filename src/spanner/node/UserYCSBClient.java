@@ -9,6 +9,8 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hbase.client.RowLock;
 import org.zeromq.ZMQ;
@@ -32,6 +34,10 @@ public class UserYCSBClient extends Node implements Runnable{
 	NodeProto transClient ;
 	NodeProto clientNode;
 	File inputFile;
+	AtomicInteger obtainedResults = null;
+	AtomicInteger totalNoofCommits = null;
+	AtomicLong avgLatency = null;
+	int totalNoOfInputs = 0;
 	HashMap<String, TransDetail> commits = null;
 	HashMap<String, TransDetail> aborts = null;
 	HashMap<String, TransDetail> inputs = null;
@@ -53,6 +59,9 @@ public class UserYCSBClient extends Node implements Runnable{
 		else
 			transClient = NodeProto.newBuilder().setHost(transcli[0]).setPort(Integer.parseInt(transcli[1])).build();
 		beginTimeStamp = System.currentTimeMillis();
+		obtainedResults = new AtomicInteger(0);
+		totalNoofCommits = new AtomicInteger(0);
+		avgLatency = new AtomicLong(0);
 		commits = new HashMap<String, TransDetail>();
 		aborts = new HashMap<String, TransDetail>();
 		inputs = new HashMap<String,TransDetail>();
@@ -180,6 +189,7 @@ public class UserYCSBClient extends Node implements Runnable{
 		MetaDataMsg msg = new MetaDataMsg(clientNode, readSet, writeSet, MetaDataMsgType.REQEUST);
 		msg.setUID(uid);
 		inputs.put(uid, new TransDetail(System.currentTimeMillis()));
+		totalNoOfInputs++;
 		AddLogEntry("Sent Txn "+uid+" with startTime "+inputs.get(uid).getStartTime());
 		sendMetaDataMsg(msg);
 	}
@@ -208,19 +218,28 @@ public class UserYCSBClient extends Node implements Runnable{
 		
 		String uid = msg.getTransaction().getTransactionID();
 		Long responseTime = System.currentTimeMillis();
+		TransDetail transDetail = null;
 		if(msg.getMsgType() == ClientOPMsgType.COMMIT){
-			TransDetail transDetail = inputs.get(uid);
+			transDetail = inputs.get(uid);
 			transDetail.setEndTime(responseTime);
 			commits.put(uid, transDetail);
+			totalNoofCommits.incrementAndGet();
+			
 			AddLogEntry("Txn "+uid+" Commited with latency "+transDetail.getLatency());
 		}
 		else{
-			TransDetail transDetail = inputs.get(uid);
+			transDetail = inputs.get(uid);
 			transDetail.setEndTime(responseTime);
 			aborts.put(uid, transDetail);
 			AddLogEntry("Txn "+uid+" Aborted with latency "+transDetail.getLatency());
 		}
 		AddLogEntry("Experimental Time "+(responseTime - beginTimeStamp));
+		obtainedResults.incrementAndGet();
+		avgLatency.set((avgLatency.get() + transDetail.getLatency())/obtainedResults.get());
+		if(obtainedResults.get() == totalNoOfInputs){
+			AddLogEntry("Obtained all results. Avg Latency "+avgLatency.get());
+			Thread.interrupted();
+		}
 	}
 
 	public static void main(String[] args) throws IOException, ClassNotFoundException {
