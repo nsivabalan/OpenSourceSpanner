@@ -211,7 +211,6 @@ public class TransClient extends Node implements Runnable{
 		}
 	}
 
-
 	/**
 	 * Method used to process transaction request from user client
 	 * @param msg
@@ -219,7 +218,8 @@ public class TransClient extends Node implements Runnable{
 	private synchronized void handleMetaDataRequest(MetaDataMsg msg)
 	{
 		AddLogEntry("Handling Meta data request "+msg);
-		String uid = msg.getUID();
+		//String uid = msg.getUID();
+		String uid = java.util.UUID.randomUUID().toString();
 		uidTransTypeMap.put(uid, TransactionType.INIT);
 		uidTransactionStatusMap.put(uid, new TransactionStatus(null));
 		pendingTransList.add(uid);
