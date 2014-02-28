@@ -97,25 +97,25 @@ public class Resource {
 	{
 		StringBuffer buffer = new StringBuffer();
 		try {
-		HTable table = new HTable(conf, Common.tableName);
-		
-		for(ElementProto element: writeSet.getElementsList())
-		{
-			String rowKey = element.getRow();
-			buffer.append("Writing record "+rowKey+" :: ");
-			Put put = new Put(Bytes.toBytes(rowKey));
-			for(ColElementProto colElem : element.getColsList())
-			{	
-				put.add(Bytes.toBytes(familyName), Bytes.toBytes(colElem.getCol()), Bytes
-						.toBytes(colElem.getValue()));
-				
-				buffer.append(colElem.getCol()+","+colElem.getValue()+";");
+			HTable table = new HTable(conf, Common.tableName);
+
+			for(ElementProto element: writeSet.getElementsList())
+			{
+				String rowKey = element.getRow();
+				buffer.append("Writing record "+rowKey+" :: ");
+				Put put = new Put(Bytes.toBytes(rowKey));
+				for(ColElementProto colElem : element.getColsList())
+				{	
+					put.add(Bytes.toBytes(familyName), Bytes.toBytes(colElem.getCol()), Bytes
+							.toBytes(colElem.getValue()));
+
+					buffer.append(colElem.getCol()+","+colElem.getValue()+";");
+				}
+				table.put(put);
+				buffer.append("\n");
 			}
-			table.put(put);
-			buffer.append("\n");
-		}
-		table.close();
-		logger.log(Level.INFO, buffer.toString());
+			table.close();
+			logger.log(Level.INFO, buffer.toString());
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -143,6 +143,28 @@ public class Resource {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+
+	public  boolean ifReadResourceExists(HashMap<String, ArrayList<String>> data) throws IOException{
+		HTable table = new HTable(conf, Common.tableName);
+		boolean flag = true;
+		for(String rowKey : data.keySet()){
+			Get get = new Get(rowKey.getBytes());		
+			ArrayList<String> colList = data.get(rowKey);		
+			get.addFamily(familyName.getBytes());		
+			Result rs = table.get(get);
+			HashMap<String, String> record = new HashMap<String, String>();
+			for(KeyValue kv : rs.raw()){
+				String colName = new String(kv.getRow());
+				String colVal = new String(kv.getValue());
+				if(colList.contains(colName)){
+					record.put(colName, colVal);
+				}
+			}
+			if(record.size() != colList.size()) flag = false;
+		}
+		table.close();
+		return flag;
 	}
 
 
@@ -183,7 +205,7 @@ public class Resource {
 				String rowKey = element.getRow();
 				Get get = new Get(rowKey.getBytes());
 				get.addFamily(familyName.getBytes());
-				
+
 				ArrayList<String> colList = new ArrayList<String>();
 				for(ColElementProto colElem : element.getColsList()){			
 					colList.add(colElem.getCol());
@@ -193,21 +215,21 @@ public class Resource {
 				//HashMap<String, String> record = hbaseMap.get(rowKey);
 				buffer.append("Reading Record "+rowKey+" :: ");
 				Result rs = table.get(get);
-				
-				
+
+
 				logger.log(Level.INFO, "List of cols "+colList);
 				for(KeyValue kv : rs.raw()){
-					
+
 					String colName = new String(kv.getQualifier());
-					
-					
+
+
 					String colVal = new String(kv.getValue());
 					logger.log(Level.INFO, " :: "+colName+", "+colVal);
 					//if(colList.contains(colName)){
-						logger.log(Level.INFO, "Found col "+colName+" with val "+colVal);
-						ColElementProto colElement = ColElementProto.newBuilder().setCol(colName).setValue(colVal).build();
-						recordBuilder.addCols(colElement);
-						buffer.append(colName+","+colVal+";");
+					logger.log(Level.INFO, "Found col "+colName+" with val "+colVal);
+					ColElementProto colElement = ColElementProto.newBuilder().setCol(colName).setValue(colVal).build();
+					recordBuilder.addCols(colElement);
+					buffer.append(colName+","+colVal+";");
 					//}
 				}
 
@@ -220,6 +242,56 @@ public class Resource {
 			e.printStackTrace();
 		}
 		return readResponse.build();
+	}
+
+
+	public boolean ifReadResourceExists(ElementsSetProto readSet)
+	{
+		
+		StringBuffer buffer = new StringBuffer();
+		boolean flag = true;
+		try {
+			HTable table = new HTable(conf, Common.tableName);
+
+			for(ElementProto element: readSet.getElementsList())
+			{
+				String rowKey = element.getRow();
+				Get get = new Get(rowKey.getBytes());
+				get.addFamily(familyName.getBytes());
+
+				ArrayList<String> colList = new ArrayList<String>();
+				for(ColElementProto colElem : element.getColsList()){			
+					colList.add(colElem.getCol());
+					get.addColumn(familyName.getBytes(), colElem.getCol().getBytes());
+				}
+				buffer.append("Reading Record "+rowKey+" :: ");
+				Result rs = table.get(get);
+
+
+				logger.log(Level.INFO, "List of cols "+colList);
+				if(rs.size() > 0){
+					for(KeyValue kv : rs.raw()){
+						String colName = new String(kv.getQualifier());
+						String colVal = new String(kv.getValue());
+						logger.log(Level.INFO, " :: "+colName+", "+colVal);
+						//if(colList.contains(colName)){
+						logger.log(Level.INFO, "Found col "+colName+" with val "+colVal);
+						buffer.append(colName+","+colVal+";");
+						//}
+					}
+				}
+				else 
+					flag = false;
+
+				buffer.append("\n");
+				
+			}
+			logger.log(Level.INFO, buffer.toString());
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return flag;
 	}
 
 

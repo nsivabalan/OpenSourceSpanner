@@ -84,8 +84,8 @@ public class PaxosAcceptor extends Node implements Runnable{
 	TwoPC twoPhaseCoordinator = null;
 	private int logCounter = 0;
 	RandomAccessFile logRAF = null;
-	private static ResourceHM localResource = null;
-//	private static Resource localResource = null;
+	//private static ResourceHM localResource = null;
+	private static Resource localResource = null;
 	private static FileHandler logFile = null;
 
 	public PaxosAcceptor(String shard, String nodeId, boolean isNew) throws IOException
@@ -113,8 +113,8 @@ public class PaxosAcceptor extends Node implements Runnable{
 		lockTable = new LockTable(nodeId, isNew);
 		pendingPaxosInstances = new HashSet<Integer>();
 		uidTransMap = new HashMap<String, TransactionSource>();
-		localResource = new ResourceHM(this.LOGGER);
-	//	localResource = new Resource(this.LOGGER);
+		//localResource = new ResourceHM(this.LOGGER);
+		localResource = new Resource(this.LOGGER);
 		dummyInstance = new PaxosInstance(null,  null);
 		state = PLeaderState.INIT;
 		myId = Integer.parseInt(nodeId);
@@ -355,7 +355,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 						pendingRequests.add(msgwrap);
 					}
 				}
-				
+
 				if(msgwrap.getmessageclass() == TwoPCMsg.class )
 				{
 					TwoPCMsg msg = (TwoPCMsg) msgwrap.getDeSerializedInnerMessage();
@@ -476,7 +476,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
 		pushSocket.close();
 	}
-	
+
 	/**
 	 * Method used to process ReplayLogResponse Message
 	 * @param msg
@@ -546,7 +546,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		if(logEntry.getOperation().equalsIgnoreCase("COMMITED"))
 			localResource.WriteResource(logEntry.getLogEntry());
 	}
-	
+
 	/**
 	 * Method to send ReplayAck to Leader
 	 */
@@ -731,7 +731,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 			logCounter = logPosition;
 			if(leaderAddress.equals(nodeAddress)){
 				isLeader= true;
-			//	twoPhaseCoordinator = new TwoPC(shard, nodeAddress, context, isNew);
+				//	twoPhaseCoordinator = new TwoPC(shard, nodeAddress, context, isNew);
 				this.state = PLeaderState.ACTIVE;
 				this.AddLogEntry("I am the leader as given by MDS\n" , Level.INFO);
 			}
@@ -765,7 +765,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		}
 	}
 
-	
+
 	/**
 	 * Method to send PaxosDetails message to MDS
 	 * @param dest
@@ -796,7 +796,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		pushSocket.close();
 	}
 
-	
+
 	/**
 	 * Method to send Msg to MDS informing about leadership
 	 */
@@ -850,12 +850,16 @@ public class PaxosAcceptor extends Node implements Runnable{
 			AddLogEntry("Handling process client read msg "+message);
 			NodeProto transClient = message.getSource();
 			TransactionProto trans = message.getTransaction();
-		
+
 			boolean isReadLock = true;
-			for(ElementProto element : trans.getReadSet().getElementsList())
-			{
-				if(!lockTable.getReadLock(element.getRow(), trans.getTransactionID()))
-					isReadLock = false;
+			if(!localResource.ifReadResourceExists(trans.getReadSet()))
+				isReadLock = false;
+			if(isReadLock){
+				for(ElementProto element : trans.getReadSet().getElementsList())
+				{
+					if(!lockTable.getReadLock(element.getRow(), trans.getTransactionID()))
+						isReadLock = false;
+				}
 			}
 
 			AddLogEntry("Acquired all read locks."+isReadLock, Level.FINE);
@@ -871,8 +875,13 @@ public class PaxosAcceptor extends Node implements Runnable{
 				uidTransMap.put(trans.getTransactionID(), new TransactionSource(trans, transClient, TwoPCMsgType.INFO));
 				read_response = new ClientOpMsg(nodeAddress, transaction, ClientOPMsgType.READ_RESPONSE, true);
 			}
-			else
+			else{
 				read_response = new ClientOpMsg(nodeAddress, trans, ClientOPMsgType.READ_RESPONSE, false);
+				for(ElementProto element : trans.getReadSet().getElementsList())
+				{
+					lockTable.releaseReadLock(element.getRow(), trans.getTransactionID(), false);
+				}
+			}
 
 			SendClientMessage(read_response, transClient);
 			//			System.out.println("Sent Read Data for UID - "+trans.getTransactionID());		
@@ -1004,7 +1013,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		}
 		AddLogEntry("Released all resources. No ack sent");
 	}
-	
+
 	/**
 	 * Process release resource message
 	 * @param message, ClientOpMsg
@@ -1018,7 +1027,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		AddLogEntry("Released all resources. No ack sent");
 	}
 
-	
+
 	/**
 	 * Method to send Prepare message
 	 * @param message
@@ -1041,7 +1050,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		}
 	}
 
-	
+
 	/**
 	 * Process release resource message from TwoPc
 	 * @param message, ClientOpMsg
@@ -1053,8 +1062,8 @@ public class PaxosAcceptor extends Node implements Runnable{
 		lockTable.releaseReadLocks(trans.getReadSet(), trans.getTransactionID(), true);
 		AddLogEntry("Released all resources. No ack sent");
 	}
-	
-	
+
+
 	/**
 	 * Method to process PAXOS PREPARE message
 	 * @param msg
@@ -1114,7 +1123,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 			if(paxInstance.acks.size() > acceptorsCount/2 && !paxInstance.isAcceptSent)
 			{
 				this.isLeader = true;
-			//	twoPhaseCoordinator = new TwoPC(shard, nodeAddress, context, isNew);
+				//	twoPhaseCoordinator = new TwoPC(shard, nodeAddress, context, isNew);
 				leaderAddress = nodeAddress;
 				paxInstance.isAcceptSent= true;
 				announceMDSAboutLeaderShip();
@@ -1137,9 +1146,9 @@ public class PaxosAcceptor extends Node implements Runnable{
 		}
 	}
 
-	
 
-	
+
+
 	/**
 	 * Mehtod to process incoming ACCEPT msg
 	 * @param msg
@@ -1415,7 +1424,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		}
 	}
 
-	
+
 	/**
 	 * Method to release locks for the given readset or writeset
 	 * @param elementsSetProto
@@ -1445,7 +1454,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 			TwoPCMsg message = new TwoPCMsg(nodeAddress, tempTransSource.getTrans(), TwoPCMsgType.PREPARE, true);
 			AddLogEntry("Sent PREPARE_ACK msg "+message+" to "+tempTransSource.getSource().getHost()+":"+tempTransSource.getSource().getPort());
 			SendTwoPCMessage(message, tempTransSource.getSource());
-			
+
 		}
 		else if(tempTransSource.getType() == TwoPCMsgType.COMMIT){
 			TwoPCMsg message = new TwoPCMsg(nodeAddress, tempTransSource.getTrans(), TwoPCMsgType.COMMIT, true);
@@ -1560,7 +1569,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		}
 	}
 
-	
+
 	/**
 	 * Method to send TwoPC message to TPC
 	 * @param message
@@ -1575,7 +1584,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		pushSocket.close();
 	}
 
-	
+
 	/**
 	 * Method used to append content to Transactional Log file
 	 * @param counter
@@ -1605,7 +1614,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		}
 	}
 
-	
+
 	public static void main(String args[]) throws IOException
 	{
 		if(args.length <= 2)

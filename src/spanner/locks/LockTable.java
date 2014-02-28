@@ -168,17 +168,20 @@ public class LockTable {
 			//if (committed) throw new RuntimeException("realeasing a non existing lock "+element);
 			writeToLockLogFile("LOCK_ALREADY_RELEASED", transactionId, element);
 		}
-
-		boolean containsTheElement = lockHolder.getReadLockHolders().remove(new Lock(transactionId, System.currentTimeMillis()));
-		
-		lockTable.put(element, lockHolder);
-		
-		if (!containsTheElement) {
-			//if (committed) throw new RuntimeException("releasing a non existing lock "+element);
-			writeToLockLogFile("LOCK_ALREADY_RELEASED", transactionId, element);
-		}
 		else{
-			writeToLockLogFile("RELEASE_READ_LOCK", transactionId, element);
+			boolean containsTheElement = false;
+			if(lockHolder.getReadLockHolders() != null && lockHolder.getReadLockHolders().size() > 0 ){
+				containsTheElement = lockHolder.getReadLockHolders().remove(new Lock(transactionId, System.currentTimeMillis()));
+				lockTable.put(element, lockHolder);
+			}
+
+			if (!containsTheElement) {
+				//if (committed) throw new RuntimeException("releasing a non existing lock "+element);
+				writeToLockLogFile("LOCK_ALREADY_RELEASED", transactionId, element);
+			}
+			else{
+				writeToLockLogFile("RELEASE_READ_LOCK", transactionId, element);
+			}
 		}
 
 	}
@@ -262,7 +265,7 @@ public class LockTable {
 		releaseWriteLocks(trans.getWriteSet(), trans.getTransactionID(), false);
 
 	}
-	
+
 	/**
 	 * Method used to append content to Log file for Locks
 	 * @param counter
@@ -285,8 +288,8 @@ public class LockTable {
 			e.printStackTrace();
 		}
 	}
-	
-	
+
+
 	/**
 	 * Method used to append content to Log file for Locks
 	 * @param counter

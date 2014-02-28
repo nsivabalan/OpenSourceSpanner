@@ -28,19 +28,19 @@ public class ResourceHM {
 
 	protected static Logger logger = null;
 	private HashMap<String, HashMap<String, String>> hbaseMap ;
-	
+
 	public ResourceHM(Logger logger)
 	{
 		hbaseMap = new HashMap<String, HashMap<String, String>>();
 		this.logger = logger;
-		
+
 	}
-	
+
 	public ElementsSetProto ReadResource(ElementsSetProto readSet)
 	{
 		ElementsSetProto.Builder readResponse = ElementsSetProto.newBuilder();
 		StringBuffer buffer = new StringBuffer();
-		
+
 		for(ElementProto element: readSet.getElementsList())
 		{
 			String rowKey = element.getRow();
@@ -60,21 +60,51 @@ public class ResourceHM {
 		logger.log(Level.INFO, buffer.toString());
 		return readResponse.build();
 	}
-	
+
+
+	public boolean ifReadResourceExists(ElementsSetProto readSet)
+	{
+		StringBuffer buffer = new StringBuffer();
+		boolean flag = true;
+		for(ElementProto element: readSet.getElementsList())
+		{
+			String rowKey = element.getRow();
+			HashMap<String, String> record = hbaseMap.get(rowKey);
+			buffer.append("Reading Record "+rowKey+" :: ");
+			if(record != null && record.size() > 0){
+			for(ColElementProto colElem : element.getColsList())
+			{
+				String colName = colElem.getCol();
+				if(record.containsKey(colName))
+				{
+					buffer.append(colName+","+record.get(colName)+";");
+				}
+				else
+					flag = false;
+			}
+			buffer.append("\n");
+			}
+			else
+				flag = false;
+		}
+		logger.log(Level.INFO, buffer.toString());
+		return flag;
+	}
+
 	public boolean WriteResource(ElementsSetProto writeSet)
 	{
 		StringBuffer buffer = new StringBuffer();
-		
+
 		for(ElementProto element: writeSet.getElementsList())
 		{
 			String rowKey = element.getRow();
 			buffer.append("Writing record "+rowKey+" :: ");
 			HashMap<String, String> record = null;
 			if(hbaseMap.containsKey(rowKey))
-					record = hbaseMap.get(rowKey);
+				record = hbaseMap.get(rowKey);
 			else 
-					record =  new HashMap<String, String>();
-			
+				record =  new HashMap<String, String>();
+
 			for(ColElementProto colElem : element.getColsList())
 			{
 				record.put(colElem.getCol(), colElem.getValue());
@@ -86,5 +116,5 @@ public class ResourceHM {
 		logger.log(Level.INFO, buffer.toString());
 		return true;
 	}
-	
+
 }
