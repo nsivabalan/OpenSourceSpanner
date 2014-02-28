@@ -170,7 +170,7 @@ public class TransClient extends Node implements Runnable{
 	private synchronized void checkForPendingTrans() 
 	{
 		Long curTime = new Date().getTime();
-		Set<String> pendingTransTemp = pendingTransList;
+		Set<String> pendingTransTemp = (Set<String>)pendingTransList.clone();
 		for(String uid: pendingTransTemp)
 		{
 			if(uidTransTypeMap.get(uid) != TransactionType.ABORT)
@@ -551,7 +551,7 @@ public class TransClient extends Node implements Runnable{
 	 * @param transaction
 	 * @param elements
 	 */
-	private void sendCommitedMessage(NodeProto dest, TransactionProto transaction , ElementsSetProto elements)
+	private synchronized void sendCommitedMessage(NodeProto dest, TransactionProto transaction , ElementsSetProto elements)
 	{
 		TransactionProto trans = TransactionProto.newBuilder()
 				.setTransactionID(transaction.getTransactionID())
@@ -567,7 +567,7 @@ public class TransClient extends Node implements Runnable{
 	 * Method to process acks for the txn
 	 * @param message
 	 */
-	private void ProcessClientOpMessage(ClientOpMsg message)
+	private synchronized void ProcessClientOpMessage(ClientOpMsg message)
 	{
 		AddLogEntry("Received Client Response :"+message);
 	}
@@ -578,7 +578,7 @@ public class TransClient extends Node implements Runnable{
 	 * @param message
 	 * @param dest
 	 */
-	private void SendClientOpMessage(ClientOpMsg message, NodeProto dest)
+	private synchronized void SendClientOpMessage(ClientOpMsg message, NodeProto dest)
 	{	
 		socketPush = context.socket(ZMQ.PUSH);
 		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
@@ -592,7 +592,7 @@ public class TransClient extends Node implements Runnable{
 	 * @param dest
 	 * @param message
 	 */
-	private void SendClientResponse(NodeProto dest,ClientOpMsg message)
+	private synchronized void SendClientResponse(NodeProto dest,ClientOpMsg message)
 	{
 		AddLogEntry("Sending Client Response :: "+message+"to "+dest.getHost()+":"+dest.getPort()+"\n");
 		socketPush = context.socket(ZMQ.PUSH);
@@ -609,7 +609,7 @@ public class TransClient extends Node implements Runnable{
 	 * @param transaction
 	 * @param elements
 	 */
-	private void sendAbortInitMessage(NodeProto source, NodeProto dest, TransactionProto transaction , ElementsSetProto elements)
+	private synchronized void sendAbortInitMessage(NodeProto source, NodeProto dest, TransactionProto transaction , ElementsSetProto elements)
 	{
 		TransactionProto trans = TransactionProto.newBuilder()
 				.setTransactionID(transaction.getTransactionID())
@@ -631,7 +631,7 @@ public class TransClient extends Node implements Runnable{
 	 * @param transaction
 	 * @param elements
 	 */
-	private void sendReleaseReadSetMessage(NodeProto source, NodeProto dest, TransactionProto transaction , ElementsSetProto elements, boolean isCommited)
+	private synchronized void sendReleaseReadSetMessage(NodeProto source, NodeProto dest, TransactionProto transaction , ElementsSetProto elements, boolean isCommited)
 	{
 		TransactionProto trans = null;
 		if(isCommited){

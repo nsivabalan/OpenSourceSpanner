@@ -13,15 +13,29 @@ import com.google.gson.*;
 
 public class Common {
 	private static Properties props;
-	private final static String propsFile ="src/config.props";
+	private final static String propsFile ="config.props";
 
 	public static String osspanner_home ;
 	
 	static
 	{
-        props = new Properties();
+		
+		if(System.getenv("osspanner_home") != null){
+			osspanner_home = System.getenv("osspanner_home");
+		}
+		else
+			osspanner_home = System.getProperty("user.dir");
+		
+		if(!osspanner_home.contains("OpenSourceSpanner"))
+			osspanner_home = System.getenv("HOME")+"/eclipse/workspace/OpenSourceSpanner/";
+		File filePath = new File(osspanner_home+"/logs/spannerlogs/");
+		File paxosLog = new File(osspanner_home+"/logs/paxoslog/");
+		filePath.mkdirs();
+		paxosLog.mkdirs();
 		try {
-			final InputStream cfg = new FileInputStream(propsFile);
+
+	        props = new Properties();
+			final InputStream cfg = new FileInputStream(osspanner_home+"/src/"+propsFile);
 			props.load(cfg);
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
@@ -30,16 +44,6 @@ public class Common {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		if(System.getenv("osspanner_home") != null){
-			osspanner_home = System.getenv("osspanner_home");
-		}
-		else
-			osspanner_home = System.getProperty("user.dir");
-		
-		File filePath = new File(osspanner_home+"/logs/spannerlogs/");
-		File paxosLog = new File(osspanner_home+"/logs/paxoslog/");
-		filePath.mkdirs();
-		paxosLog.mkdirs();
 	}
 	
 	

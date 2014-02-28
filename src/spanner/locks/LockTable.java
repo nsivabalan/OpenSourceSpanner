@@ -75,6 +75,7 @@ public class LockTable {
 		if (lockHolder==null) {
 			/*
 			 * First time to read this item
+			 * FIX ME
 			 */
 			LockHolders newLockHolder = new LockHolders(element);
 			newLockHolder.getReadLockHolders().add(new Lock(transactionId, System.currentTimeMillis()));

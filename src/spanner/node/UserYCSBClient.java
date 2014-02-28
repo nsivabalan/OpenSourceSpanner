@@ -1,91 +1,47 @@
 package spanner.node;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.Random;
+import java.util.Set;
+import java.util.Vector;
+import com.yahoo.ycsb.DBException;
+import com.yahoo.ycsb.TransactionalDB;
 
-import org.apache.hadoop.hbase.client.RowLock;
-import org.zeromq.ZMQ;
-
-import spanner.common.Common;
-import spanner.common.MessageWrapper;
-import spanner.common.Common.ClientOPMsgType;
-import spanner.common.Common.MetaDataMsgType;
-import spanner.message.ClientOpMsg;
-import spanner.message.MetaDataMsg;
-import spanner.message.TwoPCMsg;
 import spanner.protos.Protos.NodeProto;
 
-public class UserYCSBClient extends Node implements Runnable{
+public class UserYCSBClient extends TransactionalDB{
+	private boolean inTxn;
 
-	ZMQ.Context context = null;
-	ZMQ.Socket subscriber = null;
-	int port = -1;
-	ZMQ.Socket socket = null;
-	ZMQ.Socket socketPush = null;
 	NodeProto transClient ;
-	NodeProto clientNode;
-	File inputFile;
-	AtomicInteger obtainedResults = null;
-	AtomicInteger totalNoofCommits = null;
-	AtomicLong avgLatency = null;
-	int totalNoOfInputs = 0;
-	HashMap<String, TransDetail> commits = null;
-	HashMap<String, TransDetail> aborts = null;
-	HashMap<String, TransDetail> inputs = null;
-	Long beginTimeStamp = null;
-	public UserYCSBClient(String clientID, int port, boolean isNew, File inputFile) throws IOException
-	{
-		super(clientID, isNew);
-		context = ZMQ.context(1);
-		InetAddress addr = InetAddress.getLocalHost();
-		clientNode = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(port).build();
-		socket = context.socket(ZMQ.PULL);
-		AddLogEntry("Listening to messages at "+Common.getLocalAddress(port));
-		socket.bind("tcp://*:"+port);
-		this.port = port;
-		this.inputFile = inputFile;
-		String[] transcli = Common.getProperty("transClient").split(":");
-		if(transcli[0].equalsIgnoreCase("localhost"))
-			transClient = NodeProto.newBuilder().setHost("127.0.0.1").setPort(Integer.parseInt(transcli[1])).build();
-		else
-			transClient = NodeProto.newBuilder().setHost(transcli[0]).setPort(Integer.parseInt(transcli[1])).build();
-		beginTimeStamp = System.currentTimeMillis();
-		obtainedResults = new AtomicInteger(0);
-		totalNoofCommits = new AtomicInteger(0);
-		avgLatency = new AtomicLong(0);
-		commits = new HashMap<String, TransDetail>();
-		aborts = new HashMap<String, TransDetail>();
-		inputs = new HashMap<String,TransDetail>();
-		
-	}
-	
+	HashMap<String, ArrayList<String>> readSet = null;
+	HashMap<String, HashMap<String, String>> writeSet = null;
+	Long startTime = null;
+	String uid = null;
+	boolean isCommitted = false;
+	Long experimentTimeStamp = null;
+	IntermediateClient client = null;
+	boolean isResultObtained = false;
 	class TransDetail{
 		Long startTime;
 		Long endTime;
 		Long latency;
-		
+
 		public TransDetail(Long startTime)
 		{
 			this.startTime = startTime;
 		}
-		
+
 		public Long getStartTime() {
 			return startTime;
 		}
-		
+
 		public Long getEndTime() {
 			return endTime;
 		}
-		
+
 		public long getLatency()
 		{
 			return this.latency;
@@ -94,128 +50,192 @@ public class UserYCSBClient extends Node implements Runnable{
 			this.endTime = endTime;
 			latency = this.endTime - this.startTime;
 		}
-		
-		
 	}
 	
+	public void init () throws DBException {
 
+		try {
+			int min = 20005;
+			int max = 29999;
+			int port = min + (int)(Math.random() * ((max - min) + 1));
+			client = new IntermediateClient("client"+port, port , true, this);
 
-	public void run()
-	{
-		while (!Thread.currentThread ().isInterrupted ()) {
-			String receivedMsg = new String( socket.recv(0)).trim();
-			MessageWrapper msgwrap = MessageWrapper.getDeSerializedMessage(receivedMsg);
-			if (msgwrap != null)
-			{
-				try {
-					if (msgwrap.getmessageclass() == ClientOpMsg.class)
-					{
-						ClientOpMsg message = (ClientOpMsg)msgwrap.getDeSerializedInnerMessage();
-						ProcessClientResponse(message);
-					}
-					else {
-						throw new IllegalStateException("Message not expected of type"+msgwrap.getmessageclass()+". Ignoring silently");
-					}
-				} catch (ClassNotFoundException e) {
-					e.printStackTrace();
-				}
-			}
-		}
-		socket.close();
-		context.term();
-	}
-
-
-	/**
-	 * Method used to get input data from user
-	 * @throws NumberFormatException
-	 * @throws IOException
-	 */
-	public void init() throws NumberFormatException, IOException
-	{
-		BufferedReader br = new BufferedReader(new FileReader(inputFile));
-		String readLen = br.readLine();
-		while(readLen != null)
-		{
-			
-			int rowCount = Integer.parseInt(readLen);
-			int count = 0;
-			HashMap<String, ArrayList<String>> readSet = new HashMap<String, ArrayList<String>>();
-			while(count < rowCount)
-			{
-				String line = br.readLine();
-				String inputs[] = line.split(":");
-				String[] cols = inputs[1].split(",");
-				ArrayList<String> colList = new ArrayList<String>();
-				for(String col: cols)
-					colList.add(col);
-				readSet.put(inputs[0], colList);
-				count++;
-			}
-
-			
-			rowCount = Integer.parseInt(br.readLine());
-			count = 0;
-			HashMap<String, HashMap<String, String>> writeSet = new HashMap<String, HashMap<String, String>>();
-			while(count < rowCount)
-			{
-			
-				String line = br.readLine();
-				String inputs[] = line.split(":");
-				String[] cols = inputs[1].split(";");
-				HashMap<String, String> colList = new HashMap<String, String>();
-				for(String col: cols)
-				{
-					String[] colEntry = col.split(",");
-					colList.put(colEntry[0], colEntry[1]);
-				}
-				writeSet.put(inputs[0], colList);
-				count++;
-			}
-
-			initiateTrans(readSet, writeSet);
-			readLen = br.readLine();
+			new Thread(client).start();
+			experimentTimeStamp = System.currentTimeMillis();
+			inTxn = false;
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 	}
 
-	/**
-	 * Method to initiate transaction
-	 * @param readSet
-	 * @param writeSet
-	 */
-	private synchronized void initiateTrans(HashMap<String, ArrayList<String>> readSet, HashMap<String, HashMap<String, String>> writeSet)
-	{
-		String uid = java.util.UUID.randomUUID().toString();
-		MetaDataMsg msg = new MetaDataMsg(clientNode, readSet, writeSet, MetaDataMsgType.REQEUST);
-		msg.setUID(uid);
-		inputs.put(uid, new TransDetail(System.currentTimeMillis()));
-		totalNoOfInputs++;
-		AddLogEntry("Sent Txn "+uid+" with startTime "+inputs.get(uid).getStartTime());
-		sendMetaDataMsg(msg);
+
+	private void begin () {
+
+
+		//System.out.println ("BEGIN YCSB txn");
+
+		if (inTxn) {
+			//System.out.println ("ALREADY IN YCSB txn");
+			return;
+		}
+		else{
+			//System.out.println ("BEG1N YCSB txn");
+			readSet = new HashMap<String, ArrayList<String>>();
+			writeSet = new HashMap<String, HashMap<String, String>>();
+
+			inTxn = true;
+		}
 	}
 
-	/**
-	 * Method to send msg to MDS
-	 * @param msg
-	 */
-	private synchronized void sendMetaDataMsg(MetaDataMsg msg)
+
+	@Override
+	public synchronized int commit() {
+
+		//System.out.println ("COMMIT YCSB txn");
+
+
+		boolean success = false;
+		try {
+			client.initiateTrans(readSet, writeSet);
+			while( !isResultObtained )
+			{
+				System.out.println("Waiting .");
+				wait();
+				System.out.println("Waiting ...... ");
+			}
+			success = isCommitted;
+			long rtime = System.currentTimeMillis();
+			System.out.println ("EXP: "+experimentTimeStamp);
+			System.out.println ("C0MM1T\t"+(rtime - experimentTimeStamp)+"\t"+(rtime - startTime));
+			isResultObtained = false;
+		} catch (RuntimeException | InterruptedException e) {
+			e.printStackTrace();
+		}
+
+
+		inTxn = false;
+		if (success) return 1;
+		return -1;
+	}
+
+	@Override
+	public int rollback() {
+		throw new RuntimeException("rollback() is not implemented");
+	}
+
+	@Override
+	public int setSavePoint() {
+		throw new RuntimeException("setSavePoint() is not implemented");
+	}
+
+
+	@Override
+	public int read(String table, String key, Set<String> fields,
+			HashMap<String, String> result) {
+
+		//System.out.println ("READ YCSB txn");
+
+		//if (aborted==true) {
+		//	return 1;
+		//}
+
+		begin();
+
+		String field = (String) fields.toArray()[0];
+		int id = Integer.parseInt(field.substring(5));
+
+		String value = null;
+
+		double prob = Math.random();
+		if (prob<0.33)
+			//value = client.get("x"+id, "cf:a");
+
+			readSet.put("x"+id, new ArrayList<String>() {{
+				add("a");
+			}});
+		else if (prob<0.66)
+			readSet.put("y"+id, new ArrayList<String>() {{
+				add("a");
+			}});
+		else
+			readSet.put("z"+id, new ArrayList<String>() {{
+				add("a");
+			}});
+
+		return 1;
+	}
+
+
+	@Override
+	public int scan(String table, String startkey, int recordcount,
+			Set<String> fields, Vector<HashMap<String, String>> result) {
+		throw new RuntimeException("scan() is not implemented");
+	}
+
+	@Override
+	public int update(String table, String key, HashMap<String, String> values) {
+
+		//System.out.println ("UPDATE YCSB txn");
+
+		//if (aborted==true) {
+		//	return -1;
+		//}
+
+		begin ();
+
+		String field = (String) values.keySet().toArray()[0];
+		String value = (String) values.values().toArray()[0];
+		int id = Integer.parseInt(field.substring(5));
+		value = value.replace('|', '.');
+		String row;
+		double prob = Math.random();
+		if (prob<0.33)
+			row = "x"+id;
+		else if (prob<0.66)
+			row = "y"+id;
+		else
+			row = "z"+id;
+		value = "A";
+		//client.put(value, row, "cf:a");
+		HashMap<String, String> val = new HashMap<String, String>();
+		val.put("a", value);
+		writeSet.put(row, val);
+
+
+		return 1;
+	}
+
+	@Override
+	public int insert(String table, String key, HashMap<String, String> values) {
+		throw new RuntimeException("insert() is not implemented");
+	}
+
+	@Override
+	public int delete(String table, String key) {
+		throw new RuntimeException("delete() is not implemented");
+	}
+
+
+	public synchronized void processResponse(String clientId, String uid, long startTime, boolean isCommitted)
 	{
-		AddLogEntry("Sending Client Request "+msg+"to "+transClient.getHost()+":"+transClient.getPort()+"\n");
-		socketPush = context.socket(ZMQ.PUSH);
-		socketPush.connect("tcp://"+transClient.getHost()+":"+transClient.getPort());
-		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());
-		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
-		socketPush.close();
+		System.out.println("Processing Client response in YCSB client "+clientId);
+		this.uid = uid;
+		this.startTime = startTime;
+		this.isCommitted = isCommitted;
+		isResultObtained = true;
+		System.out.println(uid+" "+isCommitted);
+		notifyAll();
 	}
 
 	/**
 	 * Method to process transaction response
 	 * @param msg
 	 */
-	private synchronized void ProcessClientResponse(ClientOpMsg msg)
+	/*private synchronized void ProcessClientResponse(ClientOpMsg msg)
 	{
 		AddLogEntry("Received Client Response "+msg);
-		
+
 		String uid = msg.getTransaction().getTransactionID();
 		Long responseTime = System.currentTimeMillis();
 		TransDetail transDetail = null;
@@ -224,7 +244,7 @@ public class UserYCSBClient extends Node implements Runnable{
 			transDetail.setEndTime(responseTime);
 			commits.put(uid, transDetail);
 			totalNoofCommits.incrementAndGet();
-			
+
 			AddLogEntry("Txn "+uid+" Commited with latency "+transDetail.getLatency());
 		}
 		else{
@@ -240,19 +260,7 @@ public class UserYCSBClient extends Node implements Runnable{
 			AddLogEntry("Obtained all results. Avg Latency "+avgLatency.get());
 			Thread.interrupted();
 		}
-	}
+	}*/
 
-	public static void main(String[] args) throws IOException, ClassNotFoundException {
-
-		if(args.length != 3)
-			System.out.println("Usage: UserCient <ClientID> <port> <isNewLog>");
-
-		int port = Integer.parseInt(args[1]);
-		boolean isNew = Boolean.parseBoolean(args[2]);
-		File inputFile = new File(Common.dataFile);
-		UserYCSBClient client = new UserYCSBClient(args[0], port, isNew, inputFile);
-		new Thread(client).start();
-		client.init();
-	}
 
 }
