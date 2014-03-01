@@ -27,7 +27,7 @@ public class Common {
 			osspanner_home = System.getProperty("user.dir");
 		
 		if(!osspanner_home.contains("OpenSourceSpanner"))
-			osspanner_home = System.getenv("HOME")+"/eclipse/workspace/OpenSourceSpanner/";
+			osspanner_home = System.getenv("HOME")+"/OpenSourceSpanner/";
 		File filePath = new File(osspanner_home+"/logs/spannerlogs/");
 		File paxosLog = new File(osspanner_home+"/logs/paxoslog/");
 		filePath.mkdirs();
