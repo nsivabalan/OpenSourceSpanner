@@ -57,8 +57,8 @@ public class IntermediateClient extends Node implements Runnable{
 		super(clientID, isNew);
 		this.ycsbClient = ycsbClient;
 		context = ZMQ.context(1);
-		InetAddress addr = InetAddress.getLocalHost();
-		clientNode = NodeProto.newBuilder().setHost(addr.getHostAddress()).setPort(port).build();
+		String host = Common.getProperty("client");
+		clientNode = NodeProto.newBuilder().setHost(host).setPort(port).build();
 		socket = context.socket(ZMQ.PULL);
 		AddLogEntry("Listening to messages at "+Common.getLocalAddress(port));
 		socket.bind("tcp://*:"+port);
@@ -180,8 +180,7 @@ public class IntermediateClient extends Node implements Runnable{
 	 */
 	private synchronized void ProcessClientResponse(ClientOpMsg msg)
 	{
-		//AddLogEntry("Received Client Response "+msg);
-		
+		AddLogEntry("Received Client Response "+msg);
 		
 		String uid = msg.getTransaction().getTransactionID();
 		Long responseTime = System.currentTimeMillis();
