@@ -131,10 +131,19 @@ public class IntermediateClient extends Node implements Runnable{
 				}
 			}
 		}
+	//	System.out.println("Thread interrputed");
 		socket.close();
 		context.term();
+		//System.out.println("Done ..... ");
 	}
 
+	public void cleanup()
+	{
+		//System.out.println("Shutting down the thread ");
+		Thread.currentThread().interrupt();
+		//System.out.println("Successfully shut down");
+	}
+	
 	/**
 	 * Method to initiate transaction
 	 * @param readSet
@@ -171,7 +180,7 @@ public class IntermediateClient extends Node implements Runnable{
 	 */
 	private synchronized void ProcessClientResponse(ClientOpMsg msg)
 	{
-		AddLogEntry("Received Client Response "+msg);
+		//AddLogEntry("Received Client Response "+msg);
 		
 		
 		String uid = msg.getTransaction().getTransactionID();
@@ -180,15 +189,15 @@ public class IntermediateClient extends Node implements Runnable{
 		TransDetail transDetail = inputs.get(uid);
 		
 		if(msg.getMsgType() == ClientOPMsgType.COMMIT){
-			System.out.println("Making a call to ycsb method");
+		//	System.out.println("Making a call to ycsb method");
 			ycsbClient.processResponse(nodeId, uid, transDetail.getStartTime(), true);
-			System.out.println("done with the call");
+			//System.out.println("done with the call");
 		}
 		else{
-			System.out.println("Making a call to ycsb method");
-			System.out.println(uid+" .... "+transDetail.getStartTime());
+			//System.out.println("Making a call to ycsb method");
+			//System.out.println(uid+" .... "+transDetail.getStartTime());
 			ycsbClient.processResponse(nodeId, uid, transDetail.getStartTime(), false);
-			System.out.println("done with the call");
+		//	System.out.println("done with the call");
 		}
 		
 		

@@ -60,7 +60,7 @@ public class Common {
 	public enum TransactionType{ INIT, STARTED, READINIT, READDONE, WRITEINIT, COMMIT, ABORT, PREPARE_DONE};
 	public enum RequestType {PREPARE, COMMIT, ABORT};
 	public enum ClientOPMsgType{READ,WRITE,READ_RESPONSE,UNLOCK, COMMIT, RELEASE_RESOURCE, WRITE_RESPONSE,ABORT};
-	public enum MetaDataMsgType{REQEUST, RESPONSE};
+	public enum MetaDataMsgType{REQEUST, READ, READ_RESPONSE, RESPONSE};
 	public enum PaxosDetailsMsgType{ACCEPTORS, LEADER};
 	public enum PaxosMsgType{PREPARE, INIT_PAXOS, ACCEPT,ACK,COMMIT,ABORT, DECIDE};
 	public enum TwoPCMsgType{COMMIT, ABORT, INFO, PREPARE, ACK, RELEASE};

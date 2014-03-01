@@ -51,7 +51,7 @@ public class UserYCSBClient extends TransactionalDB{
 			latency = this.endTime - this.startTime;
 		}
 	}
-	
+
 	public void init () throws DBException {
 
 		try {
@@ -100,9 +100,9 @@ public class UserYCSBClient extends TransactionalDB{
 			client.initiateTrans(readSet, writeSet);
 			while( !isResultObtained )
 			{
-				System.out.println("Waiting .");
+				//System.out.println("Waiting .");
 				wait();
-				System.out.println("Waiting ...... ");
+				//System.out.println("Waiting ...... ");
 			}
 			success = isCommitted;
 			long rtime = System.currentTimeMillis();
@@ -115,124 +115,132 @@ public class UserYCSBClient extends TransactionalDB{
 
 
 		inTxn = false;
-		if (success) return 1;
-		return -1;
-	}
+		if (success)
+			return 1;
+	return -1;
+}
 
-	@Override
-	public int rollback() {
-		throw new RuntimeException("rollback() is not implemented");
-	}
+@Override
+public int rollback() {
+	throw new RuntimeException("rollback() is not implemented");
+}
 
-	@Override
-	public int setSavePoint() {
-		throw new RuntimeException("setSavePoint() is not implemented");
-	}
-
-
-	@Override
-	public int read(String table, String key, Set<String> fields,
-			HashMap<String, String> result) {
-
-		//System.out.println ("READ YCSB txn");
-
-		//if (aborted==true) {
-		//	return 1;
-		//}
-
-		begin();
-
-		String field = (String) fields.toArray()[0];
-		int id = Integer.parseInt(field.substring(5));
-
-		String value = null;
-
-		double prob = Math.random();
-		if (prob<0.33)
-			//value = client.get("x"+id, "cf:a");
-
-			readSet.put("x"+id, new ArrayList<String>() {{
-				add("a");
-			}});
-		else if (prob<0.66)
-			readSet.put("y"+id, new ArrayList<String>() {{
-				add("a");
-			}});
-		else
-			readSet.put("z"+id, new ArrayList<String>() {{
-				add("a");
-			}});
-
-		return 1;
-	}
+@Override
+public int setSavePoint() {
+	throw new RuntimeException("setSavePoint() is not implemented");
+}
 
 
-	@Override
-	public int scan(String table, String startkey, int recordcount,
-			Set<String> fields, Vector<HashMap<String, String>> result) {
-		throw new RuntimeException("scan() is not implemented");
-	}
+@Override
+public int read(String table, String key, Set<String> fields,
+		HashMap<String, String> result) {
 
-	@Override
-	public int update(String table, String key, HashMap<String, String> values) {
+	//System.out.println ("READ YCSB txn");
 
-		//System.out.println ("UPDATE YCSB txn");
+	//if (aborted==true) {
+	//	return 1;
+	//}
 
-		//if (aborted==true) {
-		//	return -1;
-		//}
+	begin();
 
-		begin ();
+	String field = (String) fields.toArray()[0];
+	int id = Integer.parseInt(field.substring(5));
 
-		String field = (String) values.keySet().toArray()[0];
-		String value = (String) values.values().toArray()[0];
-		int id = Integer.parseInt(field.substring(5));
-		value = value.replace('|', '.');
-		String row;
-		double prob = Math.random();
-		if (prob<0.33)
-			row = "x"+id;
-		else if (prob<0.66)
-			row = "y"+id;
-		else
-			row = "z"+id;
-		value = "A";
-		//client.put(value, row, "cf:a");
-		HashMap<String, String> val = new HashMap<String, String>();
-		val.put("a", value);
-		writeSet.put(row, val);
+	String value = null;
 
+	double prob = Math.random();
+	if (prob<0.33)
+		//value = client.get("x"+id, "cf:a");
 
-		return 1;
-	}
+		readSet.put("x"+id, new ArrayList<String>() {{
+			add("a");
+		}});
+	else if (prob<0.66)
+		readSet.put("y"+id, new ArrayList<String>() {{
+			add("a");
+		}});
+	else
+		readSet.put("z"+id, new ArrayList<String>() {{
+			add("a");
+		}});
 
-	@Override
-	public int insert(String table, String key, HashMap<String, String> values) {
-		throw new RuntimeException("insert() is not implemented");
-	}
-
-	@Override
-	public int delete(String table, String key) {
-		throw new RuntimeException("delete() is not implemented");
-	}
+	return 1;
+}
 
 
-	public synchronized void processResponse(String clientId, String uid, long startTime, boolean isCommitted)
-	{
-		System.out.println("Processing Client response in YCSB client "+clientId);
-		this.uid = uid;
-		this.startTime = startTime;
-		this.isCommitted = isCommitted;
-		isResultObtained = true;
-		System.out.println(uid+" "+isCommitted);
-		notifyAll();
-	}
+@Override
+public int scan(String table, String startkey, int recordcount,
+		Set<String> fields, Vector<HashMap<String, String>> result) {
+	throw new RuntimeException("scan() is not implemented");
+}
 
-	/**
-	 * Method to process transaction response
-	 * @param msg
-	 */
-	/*private synchronized void ProcessClientResponse(ClientOpMsg msg)
+@Override
+public int update(String table, String key, HashMap<String, String> values) {
+
+	//System.out.println ("UPDATE YCSB txn");
+
+	//if (aborted==true) {
+	//	return -1;
+	//}
+
+	begin ();
+
+	String field = (String) values.keySet().toArray()[0];
+	String value = (String) values.values().toArray()[0];
+	int id = Integer.parseInt(field.substring(5));
+	value = value.replace('|', '.');
+	String row;
+	double prob = Math.random();
+	if (prob<0.33)
+		row = "x"+id;
+	else if (prob<0.66)
+		row = "y"+id;
+	else
+		row = "z"+id;
+	value = "A";
+	//client.put(value, row, "cf:a");
+	HashMap<String, String> val = new HashMap<String, String>();
+	val.put("a", value);
+	writeSet.put(row, val);
+
+
+	return 1;
+}
+
+@Override
+public int insert(String table, String key, HashMap<String, String> values) {
+	throw new RuntimeException("insert() is not implemented");
+}
+
+@Override
+public int delete(String table, String key) {
+	throw new RuntimeException("delete() is not implemented");
+}
+
+
+public synchronized void processResponse(String clientId, String uid, long startTime, boolean isCommitted)
+{
+	//	System.out.println("Processing Client response in YCSB client "+clientId);
+	this.uid = uid;
+	this.startTime = startTime;
+	this.isCommitted = isCommitted;
+	isResultObtained = true;
+	System.out.println("Txn : "+uid+" isCommitted :: "+isCommitted);
+	notifyAll();
+}
+
+@Override
+public void cleanup()
+{
+	client.cleanup();
+	System.out.println("Client thread shutdown");
+}
+
+/**
+ * Method to process transaction response
+ * @param msg
+ */
+/*private synchronized void ProcessClientResponse(ClientOpMsg msg)
 	{
 		AddLogEntry("Received Client Response "+msg);
 

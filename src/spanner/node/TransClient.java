@@ -122,6 +122,8 @@ public class TransClient extends Node implements Runnable{
 						MetaDataMsg message = (MetaDataMsg)msgwrap.getDeSerializedInnerMessage();
 						if(message.getMsgType() == MetaDataMsgType.RESPONSE)
 							handleMetaDataResponse(message);
+						else if(message.getMsgType() == MetaDataMsgType.READ)
+							handleMetaDataRequestReadLock(message);
 						else if(message.getMsgType() == MetaDataMsgType.REQEUST)
 							handleMetaDataRequest(message);
 					}
@@ -212,6 +214,30 @@ public class TransClient extends Node implements Runnable{
 	}
 
 
+	private synchronized void handleReadLock(MetaDataMsg msg)
+	{
+		
+	}
+	
+	
+	/**
+	 * Method used to process transaction request from user client
+	 * @param msg
+	 */
+	private synchronized void handleMetaDataRequestReadLock(MetaDataMsg msg)
+	{
+		AddLogEntry("Handling Meta data request for Read Lock "+msg);
+		String uid = msg.getUID();
+		//String uid = java.util.UUID.randomUUID().toString();
+		uidTransTypeMap.put(uid, TransactionType.INIT);
+		uidTransactionStatusMap.put(uid, new TransactionStatus(null));
+		pendingTransList.add(uid);
+		clientMappings.put(uid, msg.getSource());
+		MetaDataMsg message = new MetaDataMsg(transClient, msg.getReadSet(), msg.getWriteSet(), MetaDataMsgType.REQEUST, uid);
+		sendMetaDataMsg(message);
+	}
+	
+	
 	/**
 	 * Method used to process transaction request from user client
 	 * @param msg
