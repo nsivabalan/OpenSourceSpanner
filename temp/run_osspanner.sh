@@ -1,4 +1,4 @@
-WORKSPACE=~/eclipse/workspace/OpenSourceSpanner/
+WORKSPACE=~/OpenSourceSpanner/
 echo "EXPERIMENT ___________"
 
 if [ $# -lt 3 ]
