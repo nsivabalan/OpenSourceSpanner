@@ -59,7 +59,7 @@ public class TransClient extends Node implements Runnable{
 	{
 		super(clientID, isNew);
 		context = ZMQ.context(1);
-		String[] tsClient = Common.getProperty("transClient").split(":");
+		//String[] tsClient = Common.getProperty("transClient").split(":");
 		InetAddress addr = InetAddress.getLocalHost();
 		//transClient = NodeProto.newBuilder().setHost(tsClient[0]).setPort(port).build();
 		transClient = NodeProto.newBuilder().setHost("127.0.0.1").setPort(port).build();
