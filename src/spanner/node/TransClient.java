@@ -691,8 +691,8 @@ public class TransClient extends Node implements Runnable{
 			System.out.println("ClientID HostIP port IsNewLog ");
 		}
 
-		int port = Integer.parseInt(args[1]);
-		boolean isNew = Boolean.parseBoolean(args[2]);
+		int port = Integer.parseInt(args[2]);
+		boolean isNew = Boolean.parseBoolean(args[3]);
 		TransClient client = new TransClient(args[0], args[1], port, isNew);
 		new Thread(client).start();
 		client.executeDaemon();
