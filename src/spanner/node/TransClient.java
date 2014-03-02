@@ -298,6 +298,7 @@ public class TransClient extends Node implements Runnable{
 			{
 				NodeProto dest = partitionServer.getPartitionServer().getHost();
 				//Fix me: just  send trans id
+				AddLogEntry("Sending Read Lock msg to "+dest.getHost()+":"+dest.getPort()+" : "+partitionServer.getElements());
 				sendClientReadLockMessage(dest, trans, partitionServer.getElements());
 			}
 			//Fix me: check why this block is req

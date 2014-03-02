@@ -70,9 +70,9 @@ public class Common {
 	public enum PLeaderState{ACTIVE, INIT, DORMANT};
 	public enum AcceptorState{ACCEPT, COMMIT, COMMIT_ACK, ABORT, ABORT_ACK};
 	public enum TPCState{INIT, COMMIT, COMMIT_ACK, ABORT, ABORT_ACK};
-	public static final long TRANS_TIMEOUT = 30000;
-	public static final long TPC_TIMEOUT = 60000;
-	public static final long TRANS_CLIENT_TIMEOUT = 80000;
+	public static final long TRANS_TIMEOUT = 200;
+	public static final long TPC_TIMEOUT = 400;
+	public static final long TRANS_CLIENT_TIMEOUT = 800;
 	
 	public static String getProperty(String str)
 	{

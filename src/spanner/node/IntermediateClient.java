@@ -73,7 +73,7 @@ public class IntermediateClient extends Node implements Runnable{
 		
 		int randomTC = new Random().nextInt(transclients.length);
 		String[] hostAddress = transclients[randomTC].split(":");
-		AddLogEntry("Chosen Transactional Client "+hostAddress);
+		AddLogEntry("Chosen Transactional Client "+hostAddress[0]+":"+hostAddress[1]);
 		transClient = NodeProto.newBuilder().setHost(hostAddress[0]).setPort(Integer.parseInt(hostAddress[1])).build();
 		beginTimeStamp = System.currentTimeMillis();
 		obtainedResults = new AtomicInteger(0);

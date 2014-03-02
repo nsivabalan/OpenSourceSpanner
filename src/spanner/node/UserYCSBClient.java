@@ -60,7 +60,7 @@ public class UserYCSBClient extends TransactionalDB{
 	public void init () throws DBException {
 
 		try {
-			clients = new ArrayList<String>();
+			//clients = new ArrayList<String>();
 			
 			/*Properties props = new Properties();
 			InputStream cfg = new FileInputStream("client.info");
@@ -77,6 +77,7 @@ public class UserYCSBClient extends TransactionalDB{
 			int min = 20005;
 			int max = 29999;
 			int port = min + (int)(Math.random() * ((max - min) + 1));
+			System.out.println("Port :::: "+port);
 			client = new IntermediateClient("client"+port, port , true, this);
 
 			new Thread(client).start();
