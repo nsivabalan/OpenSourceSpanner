@@ -10,6 +10,7 @@ import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -58,16 +59,22 @@ public class IntermediateClient extends Node implements Runnable{
 		this.ycsbClient = ycsbClient;
 		context = ZMQ.context(1);
 		String host = Common.getProperty("client");
-		clientNode = NodeProto.newBuilder().setHost(host).setPort(port).build();
+		clientNode = NodeProto.newBuilder().setHost("127.0.0.1").setPort(port).build();
 		socket = context.socket(ZMQ.PULL);
 		AddLogEntry("Listening to messages at "+Common.getLocalAddress(port));
 		socket.bind("tcp://*:"+port);
 		this.port = port;
-		String[] transcli = Common.getProperty("transClient").split(":");
+		/*String[] transcli = Common.getProperty("transClient").split(":");
 		if(transcli[0].equalsIgnoreCase("localhost"))
 			transClient = NodeProto.newBuilder().setHost("127.0.0.1").setPort(Integer.parseInt(transcli[1])).build();
 		else
-			transClient = NodeProto.newBuilder().setHost(transcli[0]).setPort(Integer.parseInt(transcli[1])).build();
+			transClient = NodeProto.newBuilder().setHost(transcli[0]).setPort(Integer.parseInt(transcli[1])).build();*/
+		String[] transclients = Common.getProperty("transClients").split(",");
+		
+		int randomTC = new Random().nextInt(transclients.length);
+		String[] hostAddress = transclients[randomTC].split(":");
+		AddLogEntry("Chosen Transactional Client "+hostAddress);
+		transClient = NodeProto.newBuilder().setHost(hostAddress[0]).setPort(Integer.parseInt(hostAddress[1])).build();
 		beginTimeStamp = System.currentTimeMillis();
 		obtainedResults = new AtomicInteger(0);
 		totalNoofCommits = new AtomicInteger(0);

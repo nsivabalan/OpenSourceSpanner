@@ -1,9 +1,13 @@
 package spanner.node;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
 import java.util.Vector;
@@ -22,6 +26,7 @@ public class UserYCSBClient extends TransactionalDB{
 	String uid = null;
 	boolean isCommitted = false;
 	Long experimentTimeStamp = null;
+	ArrayList<String> clients = null;
 	IntermediateClient client = null;
 	boolean isResultObtained = false;
 	class TransDetail{
@@ -55,6 +60,20 @@ public class UserYCSBClient extends TransactionalDB{
 	public void init () throws DBException {
 
 		try {
+			clients = new ArrayList<String>();
+			
+			/*Properties props = new Properties();
+			InputStream cfg = new FileInputStream("client.info");
+			props.load(cfg);
+			String[] clientAddresses = ((String)props.get("clients")).split(",");
+			clients.addAll(Arrays.asList(clientAddresses));
+			
+			System.out.println("Total clients available "+clients.size());
+			int clientRandom = new Random().nextInt(clients.size());
+			
+			String[] hostAddress = clients.get(clientRandom).split(":");
+			*/
+			
 			int min = 20005;
 			int max = 29999;
 			int port = min + (int)(Math.random() * ((max - min) + 1));

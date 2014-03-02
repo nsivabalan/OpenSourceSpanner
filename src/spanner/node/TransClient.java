@@ -59,18 +59,19 @@ public class TransClient extends Node implements Runnable{
 	{
 		super(clientID, isNew);
 		context = ZMQ.context(1);
-		String[] tsClient = Common.getProperty("mds").split(":");
+		String[] tsClient = Common.getProperty("transClient").split(":");
 		InetAddress addr = InetAddress.getLocalHost();
-		transClient = NodeProto.newBuilder().setHost(tsClient[0]).setPort(port).build();
+		//transClient = NodeProto.newBuilder().setHost(tsClient[0]).setPort(port).build();
+		transClient = NodeProto.newBuilder().setHost("127.0.0.1").setPort(port).build();
 		socket = context.socket(ZMQ.PULL);
 		AddLogEntry("Listening to messages @ "+transClient.getHost()+":"+port);
 		socket.bind("tcp://*:"+port);
 		this.port = port;
 		String[] mds = Common.getProperty("mds").split(":");
-		if(mds[0].equalsIgnoreCase("localhost"))
+		//if(mds[0].equalsIgnoreCase("localhost"))
 			metadataService = NodeProto.newBuilder().setHost("127.0.0.1").setPort(Integer.parseInt(mds[1])).build();
-		else
-			metadataService = NodeProto.newBuilder().setHost(mds[0]).setPort(Integer.parseInt(mds[1])).build();
+		//else
+			//metadataService = NodeProto.newBuilder().setHost(mds[0]).setPort(Integer.parseInt(mds[1])).build();
 		clientMappings = new HashMap<String, NodeProto>();
 		uidTransTypeMap = new HashMap<String, TransactionType>();
 		pendingTransList = new HashSet<String>();
