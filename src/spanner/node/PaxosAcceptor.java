@@ -108,7 +108,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		//AddLogEntry("local address " +InetAddress.getLocalHost().getHostAddress());
 		AddLogEntry("Connected @ "+nodeAddress.getHost()+":"+nodeAddress.getPort(), Level.FINE);
 		String[] mds = Common.getProperty("mds").split(":");
-		metadataService = NodeProto.newBuilder().setHost(mds[0]).setPort(Integer.parseInt(mds[1])).build();
+		metadataService = NodeProto.newBuilder().setHost("127.0.0.1").setPort(Integer.parseInt(mds[1])).build();
 		//FIX ME: check what needs to be passed in as constructor
 		lockTable = new LockTable(nodeId, isNew);
 		pendingPaxosInstances = new HashSet<Integer>();

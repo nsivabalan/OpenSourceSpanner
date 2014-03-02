@@ -59,7 +59,7 @@ public class IntermediateClient extends Node implements Runnable{
 		this.ycsbClient = ycsbClient;
 		context = ZMQ.context(1);
 		String host = Common.getProperty("client");
-		clientNode = NodeProto.newBuilder().setHost("127.0.0.1").setPort(port).build();
+		clientNode = NodeProto.newBuilder().setHost("54.212.59.169").setPort(port).build();
 		socket = context.socket(ZMQ.PULL);
 		AddLogEntry("Listening to messages at "+Common.getLocalAddress(port));
 		socket.bind("tcp://*:"+port);
