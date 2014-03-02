@@ -292,6 +292,7 @@ public class TransClient extends Node implements Runnable{
 		transStatus.twoPC = transaction.getTwoPC();
 		uidTransTypeMap.put(transaction.getTransactionID(), TransactionType.READINIT );
 		uidTransactionStatusMap.put(transaction.getTransactionID(), transStatus);
+		
 
 		if(trans.getReadSet()!= null && trans.getReadSet().getElementsCount() > 0){
 			for(PartitionServerElementProto partitionServer : trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
@@ -316,7 +317,7 @@ public class TransClient extends Node implements Runnable{
 			uidTransactionStatusMap.put(trans.getTransactionID(), transStatus);
 			initiateWritePhase(trans, transaction.getTwoPC());
 		}
-		uidTransactionStatusMap.put(trans.getTransactionID(), transStatus);
+		
 	}
 
 	/**
