@@ -55,14 +55,14 @@ public class TransClient extends Node implements Runnable{
 	private Map<String, TransactionStatus> uidTransactionStatusMap = new HashMap<String, TransactionStatus>();
 	private HashSet<String> pendingTransList = null;
 
-	public TransClient(String clientID, int port, boolean isNew) throws IOException
+	public TransClient(String clientID, String host, int port, boolean isNew) throws IOException
 	{
 		super(clientID, isNew);
 		context = ZMQ.context(1);
 		//String[] tsClient = Common.getProperty("transClient").split(":");
-		InetAddress addr = InetAddress.getLocalHost();
+		//InetAddress addr = InetAddress.getLocalHost();
 		//transClient = NodeProto.newBuilder().setHost(tsClient[0]).setPort(port).build();
-		transClient = NodeProto.newBuilder().setHost("127.0.0.1").setPort(port).build();
+		transClient = NodeProto.newBuilder().setHost(host).setPort(port).build();
 		socket = context.socket(ZMQ.PULL);
 		AddLogEntry("Listening to messages @ "+transClient.getHost()+":"+port);
 		socket.bind("tcp://*:"+port);
@@ -686,14 +686,14 @@ public class TransClient extends Node implements Runnable{
 
 	public static void main(String[] args) throws IOException, ClassNotFoundException {
 
-		if(args.length != 3)
+		if(args.length != 4)
 		{
-			System.out.println("ClientID port IsNewLog ");
+			System.out.println("ClientID HostIP port IsNewLog ");
 		}
 
 		int port = Integer.parseInt(args[1]);
 		boolean isNew = Boolean.parseBoolean(args[2]);
-		TransClient client = new TransClient(args[0], port, isNew);
+		TransClient client = new TransClient(args[0], args[1], port, isNew);
 		new Thread(client).start();
 		client.executeDaemon();
 	}
