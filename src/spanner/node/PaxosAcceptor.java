@@ -1302,6 +1302,8 @@ public class PaxosAcceptor extends Node implements Runnable{
 	{
 		String uid = msg.getUID();
 		PaxosInstance paxInstance = uidPaxosInstanceMap.get(uid);
+		
+		AddLogEntry("PAXOS Reached DECISION in ::::: "+(System.currentTimeMillis() - paxInstance.getTimeStamp()));
 		if(uid.startsWith("C")){
 			Boolean isWritten = localResource.WriteResource(paxInstance.getAcceptedValue());
 

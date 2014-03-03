@@ -571,9 +571,11 @@ public class TransClient extends Node implements Runnable{
 				.setWriteSet(msg.getTransaction().getWriteSet())
 				.build();*/
 		AddLogEntry("Received TwoPC Response : "+msg);
+		
 		String uid = msg.getTransaction().getTransactionID();
 		pendingTransList.remove(msg.getTransaction().getTransactionID());
 		TransactionStatus transStatus = uidTransactionStatusMap.get(uid);
+		AddLogEntry("WRITE Phase completed in ::::: "+(System.currentTimeMillis() - transStatus.initTimeStamp));
 		if(!transStatus.isClientResponseSent){
 			ClientOpMsg message = null;
 			if(msg.getMsgType() == TwoPCMsgType.COMMIT){

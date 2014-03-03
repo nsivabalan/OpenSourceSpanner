@@ -195,6 +195,7 @@ public class TwoPC extends Node implements Runnable{
 				if(transStatus.paritcipantListPrepare.size() == transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementCount())
 				{
 					AddLogEntry("Received Prepare msg from all participants. Initiating COMMIT phase");
+					AddLogEntry("PREPARE Phase completed in ::::: "+(System.currentTimeMillis() - transStatus.initTimeStamp));
 					for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
 					{
 						try {
@@ -247,6 +248,7 @@ public class TwoPC extends Node implements Runnable{
 			if(transStatus.paritcipantListCommit.size() == transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementCount())
 			{
 				AddLogEntry("Received Commit Ack From all participants. Sending COMMIT response to Transactional Client");
+				AddLogEntry("COMMIT Phase completed(from PREPARE) in ::::: "+(System.currentTimeMillis() - transStatus.initTimeStamp));
 				TransactionProto clientResponse = TransactionProto.newBuilder()
 						.setTransactionID(transStatus.trans.getTransactionID())
 						.setTransactionStatus(TransactionStatusProto.COMMITTED)
