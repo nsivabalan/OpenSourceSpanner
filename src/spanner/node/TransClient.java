@@ -49,11 +49,13 @@ public class TransClient extends Node implements Runnable{
 	ZMQ.Socket socket = null;
 	ZMQ.Socket socketPush = null;
 	NodeProto metadataService ;
+	ZMQ.Socket metaDataSocket = null;
 	NodeProto transClient;
 	HashMap<String, NodeProto> clientMappings ;
 	HashMap<String, TransactionType> uidTransTypeMap = null;
 	private Map<String, TransactionStatus> uidTransactionStatusMap = new HashMap<String, TransactionStatus>();
 	private HashSet<String> pendingTransList = null;
+	private HashMap<NodeProto, ZMQ.Socket> addressToSocketMap = null;
 
 	public TransClient(String clientID, String host, int port, boolean isNew) throws IOException
 	{
@@ -70,11 +72,14 @@ public class TransClient extends Node implements Runnable{
 		String[] mds = Common.getProperty("mds").split(":");
 		//if(mds[0].equalsIgnoreCase("localhost"))
 			metadataService = NodeProto.newBuilder().setHost("127.0.0.1").setPort(Integer.parseInt(mds[1])).build();
+			metaDataSocket = context.socket(ZMQ.PUSH);
+			metaDataSocket.connect("tcp://"+metadataService.getHost()+":"+metadataService.getPort());
 		//else
 			//metadataService = NodeProto.newBuilder().setHost(mds[0]).setPort(Integer.parseInt(mds[1])).build();
 		clientMappings = new HashMap<String, NodeProto>();
 		uidTransTypeMap = new HashMap<String, TransactionType>();
 		pendingTransList = new HashSet<String>();
+		addressToSocketMap = new HashMap<NodeProto, ZMQ.Socket>();
 	}
 
 	final class TransactionStatus {
@@ -150,6 +155,9 @@ public class TransClient extends Node implements Runnable{
 			}
 		}
 		socket.close();
+		for(NodeProto nodeProto : addressToSocketMap.keySet())
+			addressToSocketMap.get(nodeProto).close();
+		metaDataSocket.close();
 		context.term();
 	}
 
@@ -263,11 +271,11 @@ public class TransClient extends Node implements Runnable{
 	private synchronized void sendMetaDataMsg(MetaDataMsg msg)
 	{
 		AddLogEntry("Sending Meta data request "+msg+" to MDService "+metadataService.getHost()+":"+metadataService.getPort());
-		socketPush = context.socket(ZMQ.PUSH);
-		socketPush.connect("tcp://"+metadataService.getHost()+":"+metadataService.getPort());
+		metaDataSocket = context.socket(ZMQ.PUSH);
+		metaDataSocket.connect("tcp://"+metadataService.getHost()+":"+metadataService.getPort());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());
-		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
-		socketPush.close();
+		metaDataSocket.send(msgwrap.getSerializedMessage().getBytes(), 0);
+		//socketPush.close();
 	}
 
 	/**
@@ -519,11 +527,18 @@ public class TransClient extends Node implements Runnable{
 	 */
 	private synchronized void SendTwoPCInitMessage(TwoPCMsg message, NodeProto dest)
 	{
-		socketPush = context.socket(ZMQ.PUSH);
-		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+		ZMQ.Socket pushSocket = null;
+		if(addressToSocketMap.containsKey(dest))
+			pushSocket = addressToSocketMap.get(dest);
+		else{
+			pushSocket = context.socket(ZMQ.PUSH);
+			pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+			addressToSocketMap.put(dest, pushSocket);
+		}
+		
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
-		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
-		socketPush.close();
+		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0);
+	//	socketPush.close();
 	}
 
 	/**
@@ -610,11 +625,17 @@ public class TransClient extends Node implements Runnable{
 	 */
 	private synchronized void SendClientOpMessage(ClientOpMsg message, NodeProto dest)
 	{	
-		socketPush = context.socket(ZMQ.PUSH);
-		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+		ZMQ.Socket pushSocket = null;
+		if(addressToSocketMap.containsKey(dest))
+			pushSocket = addressToSocketMap.get(dest);
+		else{
+			pushSocket = context.socket(ZMQ.PUSH);
+			pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+			addressToSocketMap.put(dest, pushSocket);
+		}
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
 		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
-		socketPush.close();
+	//	socketPush.close();
 	}
 
 	/**

@@ -21,6 +21,8 @@ import spanner.protos.Protos.PartitionServerElementProto;
 import spanner.protos.Protos.TransactionProto;
 import spanner.protos.Protos.TransactionProto.TransactionStatusProto;
 import org.zeromq.ZMQ;
+import org.zeromq.ZMQ.Socket;
+
 import spanner.common.Common.TwoPCMsgType;
 import spanner.common.Common.TransactionType;
 import spanner.common.Resource;
@@ -37,6 +39,7 @@ public class TwoPC extends Node implements Runnable{
 	BufferedReader br = null;
 	HashMap<String, TransactionType> uidTransTypeMap = null;
 	Set<String> pendingTrans = null;
+	HashMap<NodeProto, ZMQ.Socket> addressToSocketMap = null;
 
 	final class TransactionStatus {
 
@@ -78,12 +81,12 @@ public class TwoPC extends Node implements Runnable{
 		this.nodeAddress = nodeAddress;
 		uidTransTypeMap = new HashMap<String, TransactionType>();
 		pendingTrans = new HashSet<String>();
-		
+		addressToSocketMap = new HashMap<NodeProto, ZMQ.Socket>();
 	}
 
 	public void run()
 	{
-		while(true){
+		while(!Thread.currentThread().interrupted()){
 			checkForPendingTrans();
 			try {
 				Thread.sleep(2000);
@@ -92,6 +95,10 @@ public class TwoPC extends Node implements Runnable{
 				e.printStackTrace();
 			}
 		}
+		
+		for(NodeProto nodeProto : addressToSocketMap.keySet())
+			addressToSocketMap.get(nodeProto).close();
+		context.term();
 	}
 
 	/**
@@ -144,6 +151,12 @@ public class TwoPC extends Node implements Runnable{
 	{
 		AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
 		NodeProto transClient= message.getSource();
+
+		if(!addressToSocketMap.containsKey(transClient)){
+			ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
+			pushSocket.connect("tcp://"+transClient.getHost()+":"+transClient.getPort());
+			addressToSocketMap.put(transClient, pushSocket);
+		}
 		TransactionProto trans = message.getTransaction();
 		AddLogEntry("Received INFO msg "+message+" from "+transClient.getHost()+":"+transClient.getPort()+"\n", Level.INFO);
 		TransactionStatus transStatus = new TransactionStatus(transClient, trans);
@@ -163,15 +176,22 @@ public class TwoPC extends Node implements Runnable{
 	public synchronized void ProcessPrepareMessage(TwoPCMsg message) throws IOException
 	{
 		AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
-		NodeProto transClient= message.getSource();
+		NodeProto participant= message.getSource();
+
+		if(!addressToSocketMap.containsKey(participant)){
+			ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
+			pushSocket.connect("tcp://"+participant.getHost()+":"+participant.getPort());
+			addressToSocketMap.put(participant, pushSocket);
+		}
+		
 		TransactionProto trans = message.getTransaction();
 		String uid = trans.getTransactionID();
-		AddLogEntry("Received Prepare msg "+message+" from participant "+transClient.getHost()+":"+transClient.getPort()+"\n");
+		AddLogEntry("Received Prepare msg "+message+" from participant "+participant.getHost()+":"+participant.getPort()+"\n");
 		if(pendingTrans.contains(trans.getTransactionID()))
 		{
 			TransactionStatus transStatus = uidTransactionStatusMap.get(trans.getTransactionID());
 			if(uidTransTypeMap.get(uid) != TransactionType.ABORT){
-				transStatus.paritcipantListPrepare.add(transClient);
+				transStatus.paritcipantListPrepare.add(participant);
 				if(transStatus.paritcipantListPrepare.size() == transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementCount())
 				{
 					AddLogEntry("Received Prepare msg from all participants. Initiating COMMIT phase");
@@ -236,7 +256,7 @@ public class TwoPC extends Node implements Runnable{
 
 				pendingTrans.remove(trans.getTransactionID());
 				//FIX ME: release read set for the trans
-				
+
 				for(PartitionServerElementProto partitionServer : transStatus.trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
 				{
 					NodeProto dest = partitionServer.getPartitionServer().getHost();
@@ -244,7 +264,7 @@ public class TwoPC extends Node implements Runnable{
 						releaseReadSet(nodeAddress, dest, trans, partitionServer.getElements());
 					}
 				}
-				
+
 				TwoPCMsg commit_response = new TwoPCMsg(nodeAddress, clientResponse, TwoPCMsgType.COMMIT);
 				AddLogEntry("Sending Commit msg "+commit_response+" to Transactional Client "+trans.getTransactionID());
 				SendTwoPCMessage(commit_response, transStatus.source);		
@@ -271,6 +291,11 @@ public class TwoPC extends Node implements Runnable{
 	{
 		AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
 		NodeProto participant = message.getSource();
+		if(!addressToSocketMap.containsKey(participant)){
+			ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
+			pushSocket.connect("tcp://"+participant.getHost()+":"+participant.getPort());
+			addressToSocketMap.put(participant, pushSocket);
+		}
 		TransactionProto trans = message.getTransaction();
 		AddLogEntry("Received Abort msg "+message+" from "+participant.getHost()+":"+participant.getPort());
 		String uid = trans.getTransactionID();
@@ -295,7 +320,7 @@ public class TwoPC extends Node implements Runnable{
 					sendAbortInitMessage(nodeAddress, dest, trans, partitionServer.getElements());
 				}
 			}
-			
+
 			for(PartitionServerElementProto partitionServer : transStatus.trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
 			{
 				NodeProto dest = partitionServer.getPartitionServer().getHost();
@@ -343,13 +368,19 @@ public class TwoPC extends Node implements Runnable{
 	private void SendCommitInitMessage(TwoPCMsg message, NodeProto dest)
 	{			
 		AddLogEntry("Sent Commit Init msg "+message+" to Participant- "+dest.getHost()+":"+dest.getPort());
-		socketPush = context.socket(ZMQ.PUSH);
-		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+		ZMQ.Socket pushSocket = null;
+		if(addressToSocketMap.containsKey(dest))
+			pushSocket = addressToSocketMap.get(dest);
+		else{
+			pushSocket = context.socket(ZMQ.PUSH);
+			pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+			addressToSocketMap.put(dest, pushSocket);
+		}
+		
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
-		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
-		socketPush.close();
+		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0);
 	}
-	
+
 	/**
 	 * Method used to release ReadSet after second phase of Two Phase Commit among all participants
 	 * @param source
@@ -398,13 +429,19 @@ public class TwoPC extends Node implements Runnable{
 	 */
 	private void SendTwoPCMessage(TwoPCMsg message, NodeProto dest)
 	{
-		ZMQ.Socket socket = context.socket(ZMQ.PUSH);
-		socket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+		ZMQ.Socket pushSocket = null;
+		if(addressToSocketMap.containsKey(dest))
+			pushSocket = addressToSocketMap.get(dest);
+		else{
+			pushSocket = context.socket(ZMQ.PUSH);
+			pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+			addressToSocketMap.put(dest, pushSocket);
+		}
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
-		socket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
+		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
 	}
 
-	
+
 	/**
 	 * Handle abort message from a trans client
 	 * @param message, ClientOpMsg
@@ -430,18 +467,18 @@ public class TwoPC extends Node implements Runnable{
 			for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
 			{
 				NodeProto dest = partitionServer.getPartitionServer().getHost();
-					sendAbortInitMessage(nodeAddress, dest, trans, partitionServer.getElements());
-				
+				sendAbortInitMessage(nodeAddress, dest, trans, partitionServer.getElements());
+
 			}
-			
+
 			for(PartitionServerElementProto partitionServer : transStatus.trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
 			{
 				NodeProto dest = partitionServer.getPartitionServer().getHost();
-					releaseReadSet(nodeAddress, dest, trans, partitionServer.getElements());
+				releaseReadSet(nodeAddress, dest, trans, partitionServer.getElements());
 			}
 		}
 	}
-	
+
 	/*
 	public void ProcessClientReadMessage(ClientOpMsg message)
 	{

@@ -62,6 +62,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	NodeProto leaderAddress = null;
 	int myId;
 	NodeProto metadataService ;
+	ZMQ.Socket metaDataSocket = null;
 	boolean isLeader ;
 	String shard ;
 	PLeaderState state ;
@@ -82,10 +83,12 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private ArrayList<MessageWrapper> pendingRequests = null;
 	private HashSet<NodeProto> pendingReplayReplicas = null;
 	TwoPC twoPhaseCoordinator = null;
+	private ZMQ.Socket leaderSocket = null;
 	private int logCounter = 0;
 	RandomAccessFile logRAF = null;
 	//private static ResourceHM localResource = null;
 	private static Resource localResource = null;
+	public HashMap<NodeProto, ZMQ.Socket> addressToSocketMap = null;
 	private static FileHandler logFile = null;
 
 	public PaxosAcceptor(String shard, String nodeId, boolean isNew) throws IOException
@@ -108,9 +111,12 @@ public class PaxosAcceptor extends Node implements Runnable{
 		//AddLogEntry("local address " +InetAddress.getLocalHost().getHostAddress());
 		AddLogEntry("Connected @ "+nodeAddress.getHost()+":"+nodeAddress.getPort(), Level.FINE);
 		int mdsIndex = nodeId.charAt(0)-'0';
-		
+
 		String[] mds = Common.getProperty("mds_"+mdsIndex%3).split(":");
 		metadataService = NodeProto.newBuilder().setHost(mds[0]).setPort(Integer.parseInt(mds[1])).build();
+
+		metaDataSocket = context.socket(ZMQ.PUSH);
+		metaDataSocket.connect("tcp://"+metadataService.getHost()+":"+metadataService.getPort());
 		//FIX ME: check what needs to be passed in as constructor
 		lockTable = new LockTable(nodeId, isNew);
 		pendingPaxosInstances = new HashSet<Integer>();
@@ -128,6 +134,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		pendingRequests = new ArrayList<MessageWrapper>();
 		pendingReplayReplicas = new HashSet<NodeProto>();
 		this.clearLog = isNew;
+		addressToSocketMap = new HashMap<NodeProto, ZMQ.Socket>();
 		sendPaxosMsgRequestingAcceptors();
 		sendPaxosMsgRequestingLeader();
 	}
@@ -263,6 +270,10 @@ public class PaxosAcceptor extends Node implements Runnable{
 			handleIncomingMessage(msgwrap);
 		}
 		socket.close();
+		for(NodeProto nodeProto : addressToSocketMap.keySet())
+			addressToSocketMap.get(nodeProto).close();
+		metaDataSocket.close();
+		leaderSocket.close();
 		context.term();
 	}
 
@@ -472,11 +483,10 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private void sendReplayLogMsg(NodeProto dest, ReplayMsg message)
 	{
 		this.AddLogEntry("Sent "+message, Level.INFO);
-		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
-		pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
-		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
-		pushSocket.close();
+		metaDataSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
+		//pushSocket.close();
 	}
 
 	/**
@@ -556,11 +566,11 @@ public class PaxosAcceptor extends Node implements Runnable{
 	{
 		ReplayMsg msg = new ReplayMsg(nodeAddress, ReplayMsgType.ACK);
 		this.AddLogEntry("Sent "+msg, Level.INFO);
-		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
-		pushSocket.connect("tcp://"+leaderAddress.getHost()+":"+leaderAddress.getPort());
+		//ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
+		//pushSocket.connect("tcp://"+leaderAddress.getHost()+":"+leaderAddress.getPort());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());
-		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
-		pushSocket.close();
+		leaderSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
+		//pushSocket.close();
 	}
 
 	/**
@@ -605,11 +615,11 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private void forwardClientRequestToLeader(ClientOpMsg waitingRequest)
 	{
 		this.AddLogEntry("Sent "+waitingRequest);
-		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
-		pushSocket.connect("tcp://"+leaderAddress.getHost()+":"+leaderAddress.getPort());
+		//ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
+		//pushSocket.connect("tcp://"+leaderAddress.getHost()+":"+leaderAddress.getPort());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(waitingRequest), waitingRequest.getClass());
-		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
-		pushSocket.close();
+		leaderSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
+		//pushSocket.close();
 	}
 
 	/**
@@ -704,8 +714,12 @@ public class PaxosAcceptor extends Node implements Runnable{
 		ArrayList<NodeProto> acceptorList = msg.getReplicas();
 		for(NodeProto node: acceptorList)
 		{
-			if(node != nodeAddress)
+			if(node != nodeAddress){
 				acceptors.add(node);
+				ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
+				pushSocket.connect("tcp://"+node.getHost()+":"+node.getPort());
+				addressToSocketMap.put(node, pushSocket);
+			}
 		}
 		acceptorsCount = acceptors.size();
 		AddLogEntry("Received Metadata (Acceptors) response from MDS \n");
@@ -726,6 +740,10 @@ public class PaxosAcceptor extends Node implements Runnable{
 	{
 		AddLogEntry("Received Metadata (Leader) response from MDS \n");
 		leaderAddress = msg.getShardLeader();
+
+		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
+		pushSocket.connect("tcp://"+leaderAddress.getHost()+":"+leaderAddress.getPort());
+		leaderSocket = pushSocket;
 		if(leaderAddress != null)
 		{
 			this.AddLogEntry("Leader availabe "+leaderAddress.getHost()+":"+leaderAddress.getPort()+"\n", Level.INFO);
@@ -776,11 +794,11 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private void sendMsgToMDS(NodeProto dest, PaxosDetailsMsg message)
 	{
 		this.AddLogEntry("Sent :: "+message+"to "+dest.getHost()+":"+dest.getPort()+"\n", Level.INFO);
-		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
-		pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+		//	ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
+		//pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
-		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
-		pushSocket.close();
+		metaDataSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
+		//pushSocket.close();
 	}
 
 	/**
@@ -791,11 +809,11 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private void sendMsgToMDS(NodeProto dest, LeaderMsg message)
 	{
 		this.AddLogEntry("Sent :: "+message+"to "+dest.getHost()+":"+dest.getPort()+"\n", Level.INFO);
-		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
-		pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+		//ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
+		//pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
-		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
-		pushSocket.close();
+		metaDataSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
+		//pushSocket.close();
 	}
 
 
@@ -818,11 +836,20 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private void SendClientMessage(ClientOpMsg message, NodeProto dest)
 	{
 		this.AddLogEntry("Sent "+message, Level.INFO);
-		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
-		pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+
+		ZMQ.Socket pushSocket = null;
+		if(addressToSocketMap.containsKey(dest))
+		{
+			pushSocket = addressToSocketMap.get(dest);
+		}
+		else{
+			pushSocket = context.socket(ZMQ.PUSH);
+			pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+			addressToSocketMap.put(dest, pushSocket);
+		}
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
 		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
-		pushSocket.close();
+		
 	}
 
 
@@ -834,11 +861,17 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private void sendPaxosMsg(NodeProto dest, PaxosMsg msg){
 		//System.out.println("Sent " + msg+" from "+nodeAddress.getHost()+":"+nodeAddress.getPort() +" to "+dest.getHost()+":"+dest.getPort()+"\n");
 		//this.AddLogEntry("Sent "+msg+"\n");
-		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
-		pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+		ZMQ.Socket pushSocket = null;
+		if(addressToSocketMap.containsKey(dest))
+			pushSocket = addressToSocketMap.get(dest);
+		else{
+			pushSocket = context.socket(ZMQ.PUSH);
+			pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+			addressToSocketMap.put(dest, pushSocket);
+		}
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());
 		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
-		pushSocket.close();	
+		//pushSocket.close();	
 	}
 
 	/**
@@ -1579,11 +1612,18 @@ public class PaxosAcceptor extends Node implements Runnable{
 	 */
 	private void SendTwoPCMessage(TwoPCMsg message, NodeProto dest)
 	{
-		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
-		pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+		ZMQ.Socket pushSocket = null;
+		if(addressToSocketMap.containsKey(dest))
+			pushSocket = addressToSocketMap.get(dest);
+		else{
+			pushSocket = context.socket(ZMQ.PUSH);
+			pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+			addressToSocketMap.put(dest, pushSocket);
+		}
+		
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
 		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
-		pushSocket.close();
+		//pushSocket.close();
 	}
 
 

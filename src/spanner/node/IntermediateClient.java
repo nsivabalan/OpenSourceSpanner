@@ -71,7 +71,9 @@ public class IntermediateClient extends Node implements Runnable{
 			transClient = NodeProto.newBuilder().setHost(transcli[0]).setPort(Integer.parseInt(transcli[1])).build();*/
 		String[] transclients = Common.getProperty("transClients").split(",");
 		
-		int randomTC = new Random().nextInt(transclients.length);
+		int randomTC = new Random().nextInt(transclients.length)-1;
+		System.out.println("Random "+randomTC+" "+(new Random().nextInt(transclients.length)-1)+" "+(new Random().nextInt(transclients.length)-1));
+		
 		String[] hostAddress = transclients[randomTC].split(":");
 		AddLogEntry("Chosen Transactional Client "+hostAddress[0]+":"+hostAddress[1]);
 		transClient = NodeProto.newBuilder().setHost(hostAddress[0]).setPort(Integer.parseInt(hostAddress[1])).build();
