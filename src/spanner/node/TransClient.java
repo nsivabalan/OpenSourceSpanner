@@ -634,7 +634,7 @@ public class TransClient extends Node implements Runnable{
 			addressToSocketMap.put(dest, pushSocket);
 		}
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
-		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
+		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0);
 	//	socketPush.close();
 	}
 
