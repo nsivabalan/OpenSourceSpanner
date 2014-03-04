@@ -209,7 +209,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		while(true){
 			checkForPendingTrans();
 			try {
-				Thread.sleep(5000);
+				Thread.sleep(1000);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}

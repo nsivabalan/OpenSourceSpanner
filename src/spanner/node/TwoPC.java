@@ -89,7 +89,7 @@ public class TwoPC extends Node implements Runnable{
 		while(!Thread.currentThread().interrupted()){
 			checkForPendingTrans();
 			try {
-				Thread.sleep(2000);
+				Thread.sleep(1000);
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -198,12 +198,6 @@ public class TwoPC extends Node implements Runnable{
 					AddLogEntry("PREPARE Phase completed in ::::: "+(System.currentTimeMillis() - transStatus.initTimeStamp));
 					for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
 					{
-						try {
-							Thread.sleep(2000);
-						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
 						uidTransTypeMap.put(trans.getTransactionID(), TransactionType.COMMIT);
 						transStatus.initTimeStamp = System.currentTimeMillis();
 						transStatus.transState = TransactionType.COMMIT;

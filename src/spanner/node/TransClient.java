@@ -167,7 +167,7 @@ public class TransClient extends Node implements Runnable{
 		while(true){
 			checkForPendingTrans();
 			try {
-				Thread.sleep(2000);
+				Thread.sleep(1000);
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -356,6 +356,7 @@ public class TransClient extends Node implements Runnable{
 		String uid = message.getTransaction().getTransactionID();
 		TransactionStatus transStatus = uidTransactionStatusMap.get(uid);
 		AddLogEntry("Msg (Read Response) received "+message+"\n");
+		AddLogEntry("Read Lock Received in ::::: "+(System.currentTimeMillis() - transStatus.initTimeStamp));
 
 		if(transStatus.state == TransactionType.ABORT)
 		{
@@ -420,7 +421,9 @@ public class TransClient extends Node implements Runnable{
 				transStatus.initTimeStamp = System.currentTimeMillis();
 				uidTransactionStatusMap.put(uid, transStatus);
 				uidTransTypeMap.put(uid, TransactionType.WRITEINIT);
-				if(transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementCount() != 0){					
+				if(transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementCount() != 0){
+					AddLogEntry("All Read Locks Obtained in ::::: "+(System.currentTimeMillis() - transStatus.initTimeStamp));
+					
 					initiateWritePhase(transStatus.trans, transStatus.twoPC);
 				}
 				else{
