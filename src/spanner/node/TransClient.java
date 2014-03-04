@@ -296,6 +296,7 @@ public class TransClient extends Node implements Runnable{
 				.build();
 
 		TransactionStatus transStatus = new TransactionStatus(trans);
+		AddLogEntry("Received and constructed metadata in :::: "+( System.currentTimeMillis()-transStatus.initTimeStamp));
 		transStatus.initTimeStamp = System.currentTimeMillis();
 		transStatus.twoPC = transaction.getTwoPC();
 		uidTransTypeMap.put(transaction.getTransactionID(), TransactionType.READINIT );
