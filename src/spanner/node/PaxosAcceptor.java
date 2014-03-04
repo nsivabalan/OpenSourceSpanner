@@ -1638,7 +1638,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	private void writeToPaxLogFile(int counter, String type, ElementsSetProto acceptedValue){
 
 		//FIX ME:
-/*		StringBuffer buffer = new StringBuffer();
+		StringBuffer buffer = new StringBuffer();
 		buffer.append(counter+":"+type+"=");
 		for(ElementProto elem: acceptedValue.getElementsList())
 		{
@@ -1656,7 +1656,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 			out.close();
 		} catch (IOException e) {
 			e.printStackTrace();
-		}*/
+		}
 	}
 
 
