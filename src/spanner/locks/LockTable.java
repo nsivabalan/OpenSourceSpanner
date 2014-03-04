@@ -274,7 +274,7 @@ public class LockTable {
 	 */
 	private void writeToLockLogFile(String type, boolean isAccepted, String transId, String element)
 	{
-		StringBuffer buffer = new StringBuffer();
+		/*StringBuffer buffer = new StringBuffer();
 		System.out.println(type+" "+isAccepted+" "+transId+" "+element);
 		if(isAccepted)
 			buffer.append(System.currentTimeMillis()+": "+element+" = "+type+" acquired by "+transId);
@@ -286,7 +286,7 @@ public class LockTable {
 			out.close();
 		} catch (IOException e) {
 			e.printStackTrace();
-		}
+		}*/
 	}
 
 
@@ -298,7 +298,7 @@ public class LockTable {
 	 */
 	private void writeToLockLogFile(String type, String transId, String element)
 	{
-		StringBuffer buffer = new StringBuffer();
+		/*StringBuffer buffer = new StringBuffer();
 		System.out.println(type+" "+transId+" "+element);
 		buffer.append(System.currentTimeMillis()+": "+element+" = "+type+" by "+transId);
 		try {
@@ -307,6 +307,6 @@ public class LockTable {
 			out.close();
 		} catch (IOException e) {
 			e.printStackTrace();
-		}
+		}*/
 	}
 }
