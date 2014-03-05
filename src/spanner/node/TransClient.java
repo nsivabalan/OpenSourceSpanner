@@ -260,6 +260,13 @@ public class TransClient extends Node implements Runnable{
 		uidTransactionStatusMap.put(uid, new TransactionStatus(null));
 		pendingTransList.add(uid);
 		clientMappings.put(uid, msg.getSource());
+		
+		if(!addressToSocketMap.containsKey( msg.getSource())){
+			ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
+			pushSocket.connect("tcp://"+msg.getSource().getHost()+":"+msg.getSource().getPort());
+			addressToSocketMap.put(msg.getSource(), pushSocket);
+		}
+		
 		MetaDataMsg message = new MetaDataMsg(transClient, msg.getReadSet(), msg.getWriteSet(), MetaDataMsgType.REQEUST, uid);
 		sendMetaDataMsg(message);
 	}
@@ -652,11 +659,17 @@ public class TransClient extends Node implements Runnable{
 	private synchronized void SendClientResponse(NodeProto dest,ClientOpMsg message)
 	{
 		AddLogEntry("Sending Client Response :: "+message+"to "+dest.getHost()+":"+dest.getPort()+"\n");
-		socketPush = context.socket(ZMQ.PUSH);
-		socketPush.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+		ZMQ.Socket pushSocket = null;
+		if(addressToSocketMap.containsKey(dest))
+			pushSocket = addressToSocketMap.get(dest);
+		else{
+			pushSocket = context.socket(ZMQ.PUSH);
+			pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
+			addressToSocketMap.put(dest, pushSocket);
+		}
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
-		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
-		socketPush.close();
+		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0);
+		//socketPush.close();
 	}
 
 	/**
