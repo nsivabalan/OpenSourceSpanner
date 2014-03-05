@@ -234,7 +234,6 @@ public class PaxosAcceptor extends Node implements Runnable{
 
 				if(pendingPaxosInstances.contains(logPos)){
 					synchronized (this) {
-						paxInstance = logPositionToPaxInstanceMap.get(logPos);
 						if(paxInstance.decides.size() == 0 && pendingPaxosInstances.contains(logPos))
 						{
 
@@ -1210,7 +1209,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 				paxInstance.accepts.add(msg.getSource());
 				int newCount = paxInstance.accepts.size();
 				if(newCount > prevCount){
-					if(newCount ==  acceptorsCount)
+					if(newCount >  acceptorsCount/2)
 					{
 						if(!paxInstance.isDecideSent)
 						{
