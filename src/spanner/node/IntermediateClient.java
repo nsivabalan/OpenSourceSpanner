@@ -59,7 +59,7 @@ public class IntermediateClient extends Node implements Runnable{
 		this.ycsbClient = ycsbClient;
 		context = ZMQ.context(1);
 		String host = Common.getProperty("client");
-		clientNode = NodeProto.newBuilder().setHost("54.212.59.169").setPort(port).build();
+		clientNode = NodeProto.newBuilder().setHost("127.0.0.1").setPort(port).build();
 		socket = context.socket(ZMQ.PULL);
 		AddLogEntry("Listening to messages at "+Common.getLocalAddress(port));
 		socket.bind("tcp://*:"+port);
@@ -69,13 +69,13 @@ public class IntermediateClient extends Node implements Runnable{
 			transClient = NodeProto.newBuilder().setHost("127.0.0.1").setPort(Integer.parseInt(transcli[1])).build();
 		else
 			transClient = NodeProto.newBuilder().setHost(transcli[0]).setPort(Integer.parseInt(transcli[1])).build();*/
-		String[] transclients = Common.getProperty("transClients").split(",");
+	//	String[] transclients = Common.getProperty("transClients").split(",");
 		
-		int randomTC = new Random().nextInt(transclients.length)-1;
-		System.out.println("Random "+randomTC+" "+(new Random().nextInt(transclients.length)-1)+" "+(new Random().nextInt(transclients.length)-1));
+		//int randomTC = new Random().nextInt(transclients.length)-1;
+		//System.out.println("Random "+randomTC+" "+(new Random().nextInt(transclients.length)-1)+" "+(new Random().nextInt(transclients.length)-1));
 		
-		String[] hostAddress = transclients[randomTC].split(":");
-		AddLogEntry("Chosen Transactional Client "+hostAddress[0]+":"+hostAddress[1]);
+		//String[] hostAddress = transclients[randomTC].split(":");
+		//AddLogEntry("Chosen Transactional Client "+hostAddress[0]+":"+hostAddress[1]);
 		//transClient = NodeProto.newBuilder().setHost(hostAddress[0]).setPort(Integer.parseInt(hostAddress[1])).build();
 		transClient = NodeProto.newBuilder().setHost("127.0.0.1").setPort(12345).build();
 		beginTimeStamp = System.currentTimeMillis();
