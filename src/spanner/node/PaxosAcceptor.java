@@ -209,7 +209,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		while(true){
 			checkForPendingTrans();
 			try {
-				Thread.sleep(1000);
+				Thread.sleep(2000);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
@@ -219,7 +219,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	/**
 	 * Method used to check pending trnsactions for aborts
 	 */
-	private synchronized void checkForPendingTrans() 
+	private void checkForPendingTrans() 
 	{
 
 		Long curTime = new Date().getTime();
@@ -231,27 +231,34 @@ public class PaxosAcceptor extends Node implements Runnable{
 			if(curTime - paxInstance.getTimeStamp() > Common.TRANS_TIMEOUT)
 			{	
 				AddLogEntry("Transaction timed out "+paxInstance);
-				if(paxInstance.decides.size() == 0)
-				{
-					AddLogEntry("Total ACCEPTs haven't reached majority. Hence aborting the trans "+uid);
-					if(uid.startsWith("P")){
-						AddLogEntry("PREPARE txn "+uid+" hasn't reached majority. Releasing all locks obtained");
-						pendingPaxosInstances.remove(logPos);
-						releaseLocks(paxInstance.getAcceptedValue(), uid);
-					}
-					else if(uid.startsWith("C")){
-						AddLogEntry("COMMIT txn "+uid +" hasn't reached majority. Hence aborting the transaction");
-						uidPaxosInstanceMap.put(uid, paxInstance);
-						pendingPaxosInstances.remove(logPos);
-						releaseLocks(paxInstance.getAcceptedValue(), uid);
-						//FIX ME: check if paxos leader should respond to the TPC or rely on TPC timeouts
-						TwoPCMsg message = new TwoPCMsg(nodeAddress, uidTransMap.get(uid).getTrans(), TwoPCMsgType.ABORT, true);
-						SendTwoPCMessage(message, uidTransMap.get(uid).getSource());
-					}
-					else if(uid.startsWith("A"))
-					{
-						AddLogEntry("ABORT txn "+uid+" hasn't reached majority. No action taken");
-						pendingPaxosInstances.remove(logPos);
+
+				if(pendingPaxosInstances.contains(logPos)){
+					synchronized (this) {
+						paxInstance = logPositionToPaxInstanceMap.get(logPos);
+						if(paxInstance.decides.size() == 0 && pendingPaxosInstances.contains(logPos))
+						{
+
+							AddLogEntry("Total ACCEPTs haven't reached majority. Hence aborting the trans "+uid);
+							if(uid.startsWith("P")){
+								AddLogEntry("PREPARE txn "+uid+" hasn't reached majority. Releasing all locks obtained");
+								pendingPaxosInstances.remove(logPos);
+								releaseLocks(paxInstance.getAcceptedValue(), uid);
+							}
+							else if(uid.startsWith("C")){
+								AddLogEntry("COMMIT txn "+uid +" hasn't reached majority. Hence aborting the transaction");
+								uidPaxosInstanceMap.put(uid, paxInstance);
+								pendingPaxosInstances.remove(logPos);
+								releaseLocks(paxInstance.getAcceptedValue(), uid);
+								//FIX ME: check if paxos leader should respond to the TPC or rely on TPC timeouts
+								TwoPCMsg message = new TwoPCMsg(nodeAddress, uidTransMap.get(uid).getTrans(), TwoPCMsgType.ABORT, true);
+								SendTwoPCMessage(message, uidTransMap.get(uid).getSource());
+							}
+							else if(uid.startsWith("A"))
+							{
+								AddLogEntry("ABORT txn "+uid+" hasn't reached majority. No action taken");
+								pendingPaxosInstances.remove(logPos);
+							}
+						}
 					}
 				}
 			}
@@ -849,7 +856,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 		}
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
 		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
-		
+
 	}
 
 
@@ -1302,7 +1309,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	{
 		String uid = msg.getUID();
 		PaxosInstance paxInstance = uidPaxosInstanceMap.get(uid);
-		
+
 		AddLogEntry("PAXOS Reached DECISION in ::::: "+(System.currentTimeMillis() - paxInstance.getTimeStamp()));
 		if(uid.startsWith("C")){
 			Boolean isWritten = localResource.WriteResource(paxInstance.getAcceptedValue());
@@ -1622,7 +1629,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 			pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 			addressToSocketMap.put(dest, pushSocket);
 		}
-		
+
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
 		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0 );
 		//pushSocket.close();

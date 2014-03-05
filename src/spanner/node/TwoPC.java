@@ -89,13 +89,13 @@ public class TwoPC extends Node implements Runnable{
 		while(!Thread.currentThread().interrupted()){
 			checkForPendingTrans();
 			try {
-				Thread.sleep(1000);
+				Thread.sleep(2000);
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
-		
+
 		for(NodeProto nodeProto : addressToSocketMap.keySet())
 			addressToSocketMap.get(nodeProto).close();
 		context.term();
@@ -104,7 +104,7 @@ public class TwoPC extends Node implements Runnable{
 	/**
 	 * Method to check for pending transactions. Triggers abort of the same after timeout
 	 */
-	private synchronized void checkForPendingTrans() 
+	private void checkForPendingTrans() 
 	{
 		Long curTime = new Date().getTime();
 		Set<String> pendingTransTemp = pendingTrans;
@@ -112,34 +112,41 @@ public class TwoPC extends Node implements Runnable{
 		{
 			if(uidTransTypeMap.get(uid) != TransactionType.ABORT)
 			{
-				TransactionStatus transStatus = uidTransactionStatusMap.get(uid);
-				if(curTime - transStatus.initTimeStamp > Common.TPC_TIMEOUT)
-				{	
-					//AddLogEntry("Transaction timed out "+uid+"\n");
-					if(uidTransTypeMap.get(uid) != TransactionType.ABORT)
-					{
-						AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
-						AddLogEntry("Aborting the transaction "+uid+" due to time out");
-						TwoPCMsg response = new TwoPCMsg(nodeAddress, transStatus.trans, TwoPCMsgType.ABORT);
-						pendingTrans.remove(uid);
-						uidTransTypeMap.put(uid, TransactionType.ABORT);
-						transStatus.transState = TransactionType.ABORT;
-						uidTransactionStatusMap.put(uid, transStatus);
-						AddLogEntry("Sending Abort msg to Trans Client "+response, Level.INFO);
-						SendTwoPCMessage(response, transStatus.source);
-						for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
-						{
-							NodeProto dest = partitionServer.getPartitionServer().getHost();
-							sendAbortInitMessage(nodeAddress, dest, transStatus.trans, partitionServer.getElements());
-						}
-						AddLogEntry("*************************** End of TPC module ************************** ", Level.FINE);
-					}
+				if(pendingTrans.contains(uid)){
+					synchronized(this){
+						if(pendingTrans.contains(uid)){
+							TransactionStatus transStatus = uidTransactionStatusMap.get(uid);
+							if(curTime - transStatus.initTimeStamp > Common.TPC_TIMEOUT)
+							{	
+								//AddLogEntry("Transaction timed out "+uid+"\n");
+								if(uidTransTypeMap.get(uid) != TransactionType.ABORT)
+								{
+									AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
+									AddLogEntry("Aborting the transaction "+uid+" due to time out");
+									TwoPCMsg response = new TwoPCMsg(nodeAddress, transStatus.trans, TwoPCMsgType.ABORT);
+									pendingTrans.remove(uid);
+									uidTransTypeMap.put(uid, TransactionType.ABORT);
+									transStatus.transState = TransactionType.ABORT;
+									uidTransactionStatusMap.put(uid, transStatus);
+									AddLogEntry("Sending Abort msg to Trans Client "+response, Level.INFO);
+									SendTwoPCMessage(response, transStatus.source);
+									for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
+									{
+										NodeProto dest = partitionServer.getPartitionServer().getHost();
+										sendAbortInitMessage(nodeAddress, dest, transStatus.trans, partitionServer.getElements());
+									}
+									AddLogEntry("*************************** End of TPC module ************************** ", Level.FINE);
+								}
 
-				}
-				else{
-					AddLogEntry("Checking for trans "+uid);
+							}
+							else{
+								AddLogEntry("Checking for trans "+uid);
+							}
+						}
+					}
 				}
 			}
+
 		}
 	}
 
@@ -183,7 +190,7 @@ public class TwoPC extends Node implements Runnable{
 			pushSocket.connect("tcp://"+participant.getHost()+":"+participant.getPort());
 			addressToSocketMap.put(participant, pushSocket);
 		}
-		
+
 		TransactionProto trans = message.getTransaction();
 		String uid = trans.getTransactionID();
 		AddLogEntry("Received Prepare msg "+message+" from participant "+participant.getHost()+":"+participant.getPort()+"\n");
@@ -372,7 +379,7 @@ public class TwoPC extends Node implements Runnable{
 			pushSocket.connect("tcp://"+dest.getHost()+":"+dest.getPort());
 			addressToSocketMap.put(dest, pushSocket);
 		}
-		
+
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
 		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0);
 	}
