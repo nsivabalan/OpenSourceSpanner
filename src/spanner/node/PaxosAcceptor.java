@@ -1210,7 +1210,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 				paxInstance.accepts.add(msg.getSource());
 				int newCount = paxInstance.accepts.size();
 				if(newCount > prevCount){
-					if(newCount >  acceptorsCount/2)
+					if(newCount ==  acceptorsCount/2)
 					{
 						if(!paxInstance.isDecideSent)
 						{
