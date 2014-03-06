@@ -178,7 +178,7 @@ public class TransClient extends Node implements Runnable{
 	/**
 	 * Method to check for pending transactions. Triggers abort of the same after timeout
 	 */
-	private void checkForPendingTrans() 
+	private synchronized void checkForPendingTrans() 
 	{
 		Long curTime = new Date().getTime();
 		Set<String> pendingTransTemp = (Set<String>)pendingTransList.clone();
@@ -186,44 +186,38 @@ public class TransClient extends Node implements Runnable{
 		{
 			if(uidTransTypeMap.get(uid) != TransactionType.ABORT)
 			{
-				if(pendingTransList.contains(uid)){
-					synchronized (this) {
-						if(pendingTransList.contains(uid)){
-							TransactionStatus transStatus = uidTransactionStatusMap.get(uid);
-							if(curTime - transStatus.initTimeStamp > Common.TRANS_CLIENT_TIMEOUT)
-							{	
-								//AddLogEntry("Transaction timed out "+uid+"\n");
-								if(uidTransTypeMap.get(uid) != TransactionType.ABORT && !transStatus.isClientResponseSent)
-								{
-									//AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
-									AddLogEntry("Aborting the transaction "+uid+" due to time out");
-									ClientOpMsg response = new ClientOpMsg(transClient, uidTransactionStatusMap.get(uid).trans, ClientOPMsgType.ABORT);
-									//TwoPCMsg response = new TwoPCMsg(transClient, transStatus.trans, TwoPCMsgType.ABORT);
-									pendingTransList.remove(uid);
-									uidTransTypeMap.put(uid, TransactionType.ABORT);
-									transStatus.isClientResponseSent = true;
-									uidTransactionStatusMap.put(uid, transStatus);
+				TransactionStatus transStatus = uidTransactionStatusMap.get(uid);
+				if(curTime - transStatus.initTimeStamp > Common.TRANS_CLIENT_TIMEOUT)
+				{	
+					//AddLogEntry("Transaction timed out "+uid+"\n");
+					if(uidTransTypeMap.get(uid) != TransactionType.ABORT && !transStatus.isClientResponseSent)
+					{
+						//AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
+						AddLogEntry("Aborting the transaction "+uid+" due to time out");
+						ClientOpMsg response = new ClientOpMsg(transClient, uidTransactionStatusMap.get(uid).trans, ClientOPMsgType.ABORT);
+						//TwoPCMsg response = new TwoPCMsg(transClient, transStatus.trans, TwoPCMsgType.ABORT);
+						pendingTransList.remove(uid);
+						uidTransTypeMap.put(uid, TransactionType.ABORT);
+						transStatus.isClientResponseSent = true;
+						uidTransactionStatusMap.put(uid, transStatus);
 
-									for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
-									{
-										NodeProto dest = partitionServer.getPartitionServer().getHost();
-										sendAbortInitMessage(transClient, dest, transStatus.trans, partitionServer.getElements());
-									}
-
-									for(PartitionServerElementProto partitionServer : transStatus.trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
-									{
-										NodeProto dest = partitionServer.getPartitionServer().getHost();
-										sendReleaseReadSetMessage(transClient, dest, transStatus.trans, partitionServer.getElements(), false);
-									}
-									AddLogEntry("Sending Abort msg to Trans Client "+response, Level.INFO);
-									SendClientResponse(clientMappings.get(uid), response);
-									//AddLogEntry("*************************** End of TPC module ************************** ", Level.FINE);
-								}
-							}
-
+						for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
+						{
+							NodeProto dest = partitionServer.getPartitionServer().getHost();
+							sendAbortInitMessage(transClient, dest, transStatus.trans, partitionServer.getElements());
 						}
+
+						for(PartitionServerElementProto partitionServer : transStatus.trans.getReadSetServerToRecordMappings().getPartitionServerElementList())
+						{
+							NodeProto dest = partitionServer.getPartitionServer().getHost();
+							sendReleaseReadSetMessage(transClient, dest, transStatus.trans, partitionServer.getElements(), false);
+						}
+						AddLogEntry("Sending Abort msg to Trans Client "+response, Level.INFO);
+						SendClientResponse(clientMappings.get(uid), response);
+						//AddLogEntry("*************************** End of TPC module ************************** ", Level.FINE);
 					}
 				}
+
 			}
 		}
 	}

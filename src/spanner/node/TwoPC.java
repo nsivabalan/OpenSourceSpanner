@@ -104,7 +104,7 @@ public class TwoPC extends Node implements Runnable{
 	/**
 	 * Method to check for pending transactions. Triggers abort of the same after timeout
 	 */
-	private void checkForPendingTrans() 
+	private synchronized void checkForPendingTrans() 
 	{
 		Long curTime = new Date().getTime();
 		Set<String> pendingTransTemp = pendingTrans;
@@ -112,38 +112,32 @@ public class TwoPC extends Node implements Runnable{
 		{
 			if(uidTransTypeMap.get(uid) != TransactionType.ABORT)
 			{
-				if(pendingTrans.contains(uid)){
-					synchronized(this){
-						if(pendingTrans.contains(uid)){
-							TransactionStatus transStatus = uidTransactionStatusMap.get(uid);
-							if(curTime - transStatus.initTimeStamp > Common.TPC_TIMEOUT)
-							{	
-								//AddLogEntry("Transaction timed out "+uid+"\n");
-								if(uidTransTypeMap.get(uid) != TransactionType.ABORT)
-								{
-									AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
-									AddLogEntry("Aborting the transaction "+uid+" due to time out");
-									TwoPCMsg response = new TwoPCMsg(nodeAddress, transStatus.trans, TwoPCMsgType.ABORT);
-									pendingTrans.remove(uid);
-									uidTransTypeMap.put(uid, TransactionType.ABORT);
-									transStatus.transState = TransactionType.ABORT;
-									uidTransactionStatusMap.put(uid, transStatus);
-									AddLogEntry("Sending Abort msg to Trans Client "+response, Level.INFO);
-									SendTwoPCMessage(response, transStatus.source);
-									for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
-									{
-										NodeProto dest = partitionServer.getPartitionServer().getHost();
-										sendAbortInitMessage(nodeAddress, dest, transStatus.trans, partitionServer.getElements());
-									}
-									AddLogEntry("*************************** End of TPC module ************************** ", Level.FINE);
-								}
-
-							}
-							else{
-								AddLogEntry("Checking for trans "+uid);
-							}
+				TransactionStatus transStatus = uidTransactionStatusMap.get(uid);
+				if(curTime - transStatus.initTimeStamp > Common.TPC_TIMEOUT)
+				{	
+					//AddLogEntry("Transaction timed out "+uid+"\n");
+					if(uidTransTypeMap.get(uid) != TransactionType.ABORT)
+					{
+						AddLogEntry("*************************** Start of TPC module ************************** ", Level.FINE);
+						AddLogEntry("Aborting the transaction "+uid+" due to time out");
+						TwoPCMsg response = new TwoPCMsg(nodeAddress, transStatus.trans, TwoPCMsgType.ABORT);
+						pendingTrans.remove(uid);
+						uidTransTypeMap.put(uid, TransactionType.ABORT);
+						transStatus.transState = TransactionType.ABORT;
+						uidTransactionStatusMap.put(uid, transStatus);
+						AddLogEntry("Sending Abort msg to Trans Client "+response, Level.INFO);
+						SendTwoPCMessage(response, transStatus.source);
+						for(PartitionServerElementProto partitionServer : transStatus.trans.getWriteSetServerToRecordMappings().getPartitionServerElementList())
+						{
+							NodeProto dest = partitionServer.getPartitionServer().getHost();
+							sendAbortInitMessage(nodeAddress, dest, transStatus.trans, partitionServer.getElements());
 						}
+						AddLogEntry("*************************** End of TPC module ************************** ", Level.FINE);
 					}
+
+				}
+				else{
+					AddLogEntry("Checking for trans "+uid);
 				}
 			}
 
