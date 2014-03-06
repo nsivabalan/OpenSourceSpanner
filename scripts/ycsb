@@ -1,0 +1,3 @@
+ssh -i sivapaxoscp3.pem ubuntu@ec2-54-212-59-169.us-west-2.compute.amazonaws.com
+ssh -i sivantpNCal.pem ubuntu@ec2-54-193-181-245.us-west-1.compute.amazonaws.com
+ssh -i sivaNVir.pem ubuntu@ec2-54-196-107-55.compute-1.amazonaws.com
