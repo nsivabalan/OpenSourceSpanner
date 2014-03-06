@@ -140,7 +140,9 @@ public class MetaDS extends Node{
 		ElementsSetProto.Builder writeSetBuilder = ElementsSetProto.newBuilder();
 		writeSetBuilder.setElementsSetType(ElementsSetTypeProto.WRITESET);
 		ElementToServerMapping.Builder writeSetServerToRecordBuilder = ElementToServerMapping.newBuilder();
-
+		
+		boolean isTwoPCInWriteSet = false;
+		
 		for(String key: writeSet.keySet())
 		{
 			ElementProto.Builder elementBuilder = ElementProto.newBuilder();
@@ -151,6 +153,7 @@ public class MetaDS extends Node{
 			}
 			writeSetBuilder.addElements(elementBuilder.build());
 			NodeProto shard = getNodeAddress(key);
+			
 			if(writeMap.containsKey(shard))
 			{
 				writeMap.get(shard).put(key, writeSet.get(key));
