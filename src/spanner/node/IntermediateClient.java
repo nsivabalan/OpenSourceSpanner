@@ -80,7 +80,7 @@ public class IntermediateClient extends Node implements Runnable{
 		String[] hostAddress = transclients[randomTC].split(":");*/
 		//AddLogEntry("Chosen Transactional Client "+hostAddress[0]+":"+hostAddress[1]);
 		//transClient = NodeProto.newBuilder().setHost(hostAddress[0]).setPort(Integer.parseInt(hostAddress[1])).build();
-		transClient = NodeProto.newBuilder().setHost("54.204.202.122").setPort(12345).build();
+		transClient = NodeProto.newBuilder().setHost("204.236.181.246").setPort(12345).build();
 		beginTimeStamp = System.currentTimeMillis();
 		obtainedResults = new AtomicInteger(0);
 		totalNoofCommits = new AtomicInteger(0);
