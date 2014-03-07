@@ -284,7 +284,7 @@ public class PaxosAcceptor extends Node implements Runnable{
 	 * Method to handle incoming Messages
 	 * @param msgwrap
 	 */
-	public synchronized void handleIncomingMessage(MessageWrapper msgwrap)
+	public void handleIncomingMessage(MessageWrapper msgwrap)
 	{
 		if (msgwrap != null ) 
 		{

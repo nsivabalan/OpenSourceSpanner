@@ -27,6 +27,7 @@ public class UserYCSBClient extends TransactionalDB{
 	boolean isCommitted = false;
 	Long experimentTimeStamp = null;
 	ArrayList<String> clients = null;
+	Long avgLatency = new Long(0);
 	IntermediateClient client = null;
 	boolean isResultObtained = false;
 	class TransDetail{
