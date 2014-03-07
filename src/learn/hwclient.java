@@ -22,9 +22,11 @@ public class hwclient{
 		for(int requestNbr = 0; requestNbr != 10; requestNbr++) {
 			System.out.println("Enter string to send to server");
 			String request = br.readLine();
+			Long startTime = System.currentTimeMillis();
 			System.out.println("Sending " + request );
 			socket.send(request.getBytes (), 0);
 			byte[] reply = socket.recv(0);
+			System.out.println("Received response in "+(System.currentTimeMillis() - startTime));
 			System.out.println("Received " + new String (reply));
 		}
 
