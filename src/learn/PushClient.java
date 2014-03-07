@@ -32,7 +32,7 @@ public class PushClient implements Runnable{
 		socket = context.socket(ZMQ.PULL);
 		socket.bind("tcp://*:5992");
 		InetAddress addr = InetAddress.getLocalHost();
-		myNode = NodeProto.newBuilder().setHost(addr.getLocalHost().getHostAddress()).setPort(5991).build();
+		myNode = NodeProto.newBuilder().setHost(addr.getLocalHost().getHostAddress()).setPort(5992).build();
 		leaderProto = NodeProto.newBuilder().setHost(host).setPort(port).build();
 		
 
@@ -43,7 +43,7 @@ public class PushClient implements Runnable{
 		while (!Thread.currentThread ().isInterrupted ()) {
 			String receivedMsg = new String( socket.recv(0)).trim();
 			MessageWrapper msgwrap = MessageWrapper.getDeSerializedMessage(receivedMsg);
-
+			System.out.println("response "+msgwrap);
 			try {
 				LeaderMsg message  = (LeaderMsg)msgwrap.getDeSerializedInnerMessage();
 				ReceiveResponse(message);
