@@ -145,6 +145,9 @@ public class IntermediateClient extends Node implements Runnable{
 			}
 		}
 	//	System.out.println("Thread interrputed");
+		MetaDataMsg msg = new MetaDataMsg(clientNode, null, null, MetaDataMsgType.CLEANUP);
+		msg.setUID("");
+		sendCleanUpMsg(msg);
 		socket.close();
 		context.term();
 		//System.out.println("Done ..... ");
@@ -187,6 +190,22 @@ public class IntermediateClient extends Node implements Runnable{
 		socketPush.close();
 	}
 
+	
+	/**
+	 * Method to send msg to MDS
+	 * @param msg
+	 */
+	private synchronized void sendCleanUpMsg(MetaDataMsg msg)
+	{
+		AddLogEntry("Sending Client Request "+msg+"to "+transClient.getHost()+":"+transClient.getPort()+"\n");
+		socketPush = context.socket(ZMQ.PUSH);
+		socketPush.connect("tcp://"+transClient.getHost()+":"+transClient.getPort());
+		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(msg), msg.getClass());
+		socketPush.send(msgwrap.getSerializedMessage().getBytes(), 0);
+		socketPush.close();
+	}
+	
+	
 	/**
 	 * Method to process transaction response
 	 * @param msg

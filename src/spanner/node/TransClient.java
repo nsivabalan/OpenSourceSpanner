@@ -132,6 +132,8 @@ public class TransClient extends Node implements Runnable{
 							handleMetaDataRequestReadLock(message);
 						else if(message.getMsgType() == MetaDataMsgType.REQEUST)
 							handleMetaDataRequest(message);
+						else if(message.getMsgType() == MetaDataMsgType.CLEANUP)
+							handleCleanUpMessage(message);
 					}
 					else if (msgwrap.getmessageclass() == ClientOpMsg.class)
 					{
@@ -269,6 +271,19 @@ public class TransClient extends Node implements Runnable{
 
 		MetaDataMsg message = new MetaDataMsg(transClient, msg.getReadSet(), msg.getWriteSet(), MetaDataMsgType.REQEUST, uid);
 		sendMetaDataMsg(message);
+	}
+	
+	
+	/**
+	 * Method used to process transaction request from user client
+	 * @param msg
+	 */
+	private synchronized void handleCleanUpMessage(MetaDataMsg msg)
+	{
+		AddLogEntry("Handling CleanUp request "+msg);
+		ZMQ.Socket pushSocket = addressToSocketMap.get(msg.getSource());
+		pushSocket.close();
+		addressToSocketMap.remove(msg.getSource());
 	}
 
 	/**
