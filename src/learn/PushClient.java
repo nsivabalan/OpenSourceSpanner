@@ -32,7 +32,7 @@ public class PushClient implements Runnable{
 		socket = context.socket(ZMQ.PULL);
 		socket.bind("tcp://*:5992");
 		InetAddress addr = InetAddress.getLocalHost();
-		myNode = NodeProto.newBuilder().setHost(addr.getLocalHost().getHostAddress()).setPort(5992).build();
+		myNode = NodeProto.newBuilder().setHost(addr.getHostName()).setPort(5992).build();
 		leaderProto = NodeProto.newBuilder().setHost(host).setPort(port).build();
 		
 

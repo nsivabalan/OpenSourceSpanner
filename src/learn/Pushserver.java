@@ -31,7 +31,7 @@ public class Pushserver implements Runnable{
 		socket = context.socket(ZMQ.PULL);
 		socket.bind("tcp://*:5991");
 		InetAddress addr = InetAddress.getLocalHost();
-		myNode = NodeProto.newBuilder().setHost(addr.getLocalHost().getHostAddress()).setPort(5991).build();
+		myNode = NodeProto.newBuilder().setHost(addr.getHostName()).setPort(5991).build();
 		
 
 	}
@@ -61,8 +61,9 @@ public class Pushserver implements Runnable{
 	{
 		ZMQ.Socket pushSocket = context.socket(ZMQ.PUSH);
 		pushSocket.connect("tcp://"+msg.getSource().getHost()+":"+msg.getSource().getPort());
-
+		
 		LeaderMsg message = new LeaderMsg(myNode, LeaderMsgType.RESPONSE, "test");
+		System.out.println("Sendign "+message+" to "+msg.getSource());
 		MessageWrapper msgwrap = new MessageWrapper(Common.Serialize(message), message.getClass());
 		pushSocket.send(msgwrap.getSerializedMessage().getBytes(), 0);
 		pushSocket.close();
