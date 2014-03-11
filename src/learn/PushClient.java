@@ -40,6 +40,7 @@ public class PushClient implements Runnable{
 
 	public void run()
 	{
+		System.out.println(" listening to "+myNode );
 		while (!Thread.currentThread ().isInterrupted ()) {
 			String receivedMsg = new String( socket.recv(0)).trim();
 			MessageWrapper msgwrap = MessageWrapper.getDeSerializedMessage(receivedMsg);
