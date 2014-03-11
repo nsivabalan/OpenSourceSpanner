@@ -7,8 +7,36 @@ TransClient
 UserClient
 MDService
 
+Installation/Deployment:
+I had some issues with automated scripts to deploy and since I dint have much time, haven't automated things. Sorry about that. But should be easy for you guys as you have done it for other projects. So for now, installing OpenSourceSpanner for a single node is as follows:
+
+1. launch node
+2. install git
+3. "go clone https://github.com/nsivabalan/OpenSourceSpanner.git"
+4. cd OpenSourceSpanner
+5. git checkout mavenfix
+6. git pull origin mavenfix
+7. sh scripts/setup_classpath.sh
+8. sh scripts/java_setup.sh //replace this installation of java with something else which may not prompt
+9. 
 
 Sample execution:
+
+set osspanner_home env variable to home directory of OpenSourceSpanner directory. For eg: if project is located at /home/ubuntu/OpenSourceSpanner, osspanner="/home/ubuntu"
+
+java -Djava.library.path=/usr/local/lib spanner.metadataservice.MDService true
+
+java -Djava.library.path=/usr/local/lib spanner.node.TransClient client1 12345 true
+
+java -Djava.library.path=/usr/local/lib spanner.node.UserClient client2 13254 true
+//above user client is command line input
+
+
+Execute MDService and TransClient in all datacentres.
+//Transclient assumes that MDService is running locally(127.0.0.1)
+
+//excute below for each server. below eg is for 3 nodes in 2 partitions.
+/make sure config.props(which MDService will read from) has all these information.
 
 java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S1 1 true
 java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S1 2 true
@@ -17,8 +45,32 @@ java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S2 4 true
 java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S2 5 true
 java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S2 6 true
 
-java -Djava.library.path=/usr/local/lib spanner.metadataservice.MDService true
-java -Djava.library.path=/usr/local/lib spanner.node.TransClient client1 12345 true
-java -Djava.library.path=/usr/local/lib spanner.node.UserClient client2 13254 true
+For YCSB:
+"sh run_osspanner.sh" from ycsb project. 
+//incase of YCSB: Intermedite Client and UserYCSBClient is used. UserYCSBClient will be invoked from run_ossappner.sh from ycsb project. run_osspanner.sh is located @ "OpenSourceSpanner/temp" directory.
+run_osspanner will invoked UserYCSBClient will inturn will invoke Intermediateclient(which is alternative to UserClient). This UserYCSBClient will generate N no of IntermediateClient threads as per the input given by user. Each IntermediateClient will send in inputs to the local TransClient(yes, it is assumed that transclient is local to IntermediateClient). If needed, uncomment the code snippet in IntermediateClient to connect to various transClient servers(line 76).
+
+
+Assumptions: 
+Static configuration read from config.props
+IntermediateClient, UserYCSBClient, transClient and MDService all should be running in same node. Many instances can be running in different nodes. But UserYCSBClient contacts a local Intermediateclient. IntermediateClient will contact local transClient and transClient will contact local MDService.
+
+
+
+P.S.: true/false as last parameter while invoking the servers is to mention whether to start from scratch or continue with previous. Incase of a server which holds data, when true is passed, log files will be cleared and it starts as a fresh node. If false is passed, it contacts Leader node to replay the log before it becomes active.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 //inputs from UserClient
