@@ -18,11 +18,16 @@ I had some issues with automated scripts to deploy and since I dint have much ti
 6. git pull origin mavenfix
 7. sh scripts/setup_classpath.sh
 8. sh scripts/java_setup.sh //replace this installation of java with something else which may not prompt
-9. 
+9. sh scripts/set_up_hbase.sh
+10. sh scripts/zmq_setup.sh
+11. sh scripts/jzmq_setup.sh 
+
+//for now, all my changes are in a branch called mavenfix. Yet to merge with main branch.
+//There is another branch called "replication" which has completely modular replicationManager. it is kinda lagging behind "mavenfix' branch, but should be easy to fix it. When I find time, I will only update "replication" branch and will let you know.
 
 Sample execution:
 
-set osspanner_home env variable to home directory of OpenSourceSpanner directory. For eg: if project is located at /home/ubuntu/OpenSourceSpanner, osspanner="/home/ubuntu"
+set osspanner_home env variable to home directory of OpenSourceSpanner directory. For eg: if project is located at /home/ubuntu/OpenSourceSpanner, osspanner_home="/home/ubuntu/"
 
 java -Djava.library.path=/usr/local/lib spanner.metadataservice.MDService true
 
@@ -31,19 +36,25 @@ java -Djava.library.path=/usr/local/lib spanner.node.TransClient client1 12345 t
 java -Djava.library.path=/usr/local/lib spanner.node.UserClient client2 13254 true
 //above user client is command line input
 
-
 Execute MDService and TransClient in all datacentres.
 //Transclient assumes that MDService is running locally(127.0.0.1)
 
-//excute below for each server. below eg is for 3 nodes in 2 partitions.
-/make sure config.props(which MDService will read from) has all these information.
+//excute below for each server. 
+Eg : 3 nodes in each of 2 partitions.
+/make sure src/config.props(which MDService will read from) has all these information.
 
+//Execute following process in each replica
 java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S1 1 true
 java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S1 2 true
 java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S1 3 true
 java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S2 4 true
 java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S2 5 true
 java -Djava.library.path=/usr/local/lib spanner.node.PaxosAcceptor S2 6 true
+
+//to give command line inputs, 
+java -Djava.library.path=/usr/local/lib spanner.node.UserClient client2 13254 true
+
+//else, follow below instructions
 
 For YCSB:
 "sh run_osspanner.sh" from ycsb project. 
@@ -53,8 +64,8 @@ run_osspanner will invoked UserYCSBClient will inturn will invoke Intermediatecl
 
 Assumptions: 
 Static configuration read from config.props
-IntermediateClient, UserYCSBClient, transClient and MDService all should be running in same node. Many instances can be running in different nodes. But UserYCSBClient contacts a local Intermediateclient. IntermediateClient will contact local transClient and transClient will contact local MDService.
-
+IntermediateClient, UserYCSBClient, transClient and MDService all should be running in same node. Many instances can be running in different nodes. But UserYCSBClient contacts a local Intermediateclient. IntermediateClient will contact local transClient and transClient will contact local MDService. 
+//IntermediateClient can be tweaked to contact any random transClients available. Uncomment line 76 and make sure config.props has all information about transclients.
 
 
 P.S.: true/false as last parameter while invoking the servers is to mention whether to start from scratch or continue with previous. Incase of a server which holds data, when true is passed, log files will be cleared and it starts as a fresh node. If false is passed, it contacts Leader node to replay the log before it becomes active.
@@ -63,14 +74,3 @@ P.S.: true/false as last parameter while invoking the servers is to mention whet
 
 
 
-
-
-
-
-
-
-
-
-
-
-//inputs from UserClient
